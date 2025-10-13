@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: financial_helper_db
+    restart: always
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-financial_helper}
+      MYSQL_USER: ${DB_USER:-django_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-django_password}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_password}
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    container_name: financial_helper_web
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+    ports:
+      - "${WEB_PORT:-8000}:8000"
+    environment:
+      - DB_HOST=db
+      - DB_NAME=${DB_NAME:-financial_helper}
+      - DB_USER=${DB_USER:-django_user}
+      - DB_PASSWORD=${DB_PASSWORD:-django_password}
+      - DB_PORT=3306
+      - DEBUG=${DEBUG:-True}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-change-this-in-production}
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
