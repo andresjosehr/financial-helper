@@ -14,6 +14,8 @@ services:
       - "${DB_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d
+    command: --bind-address=0.0.0.0 --default-authentication-plugin=mysql_native_password
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       timeout: 5s
@@ -22,9 +24,10 @@ services:
   web:
     build: .
     container_name: financial_helper_web
-    command: python manage.py runserver 0.0.0.0:8000
+    command: sh -c "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn --bind 0.0.0.0:8000 --workers 3 config.wsgi:application"
     volumes:
       - .:/app
+      - static_volume:/app/staticfiles
     ports:
       - "${WEB_PORT:-8000}:8000"
     environment:
@@ -33,11 +36,14 @@ services:
       - DB_USER=${DB_USER:-django_user}
       - DB_PASSWORD=${DB_PASSWORD:-django_password}
       - DB_PORT=3306
-      - DEBUG=${DEBUG:-True}
+      - DEBUG=${DEBUG:-False}
       - SECRET_KEY=${SECRET_KEY:-django-insecure-change-this-in-production}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-financial-helper.andresjosehr.com,localhost,127.0.0.1}
     depends_on:
       db:
         condition: service_healthy
+    restart: always
 
 volumes:
   mysql_data:
+  static_volume:
