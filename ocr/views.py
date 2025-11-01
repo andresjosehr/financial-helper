@@ -10,6 +10,13 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from PIL import Image
 
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+    HEIF_SUPPORTED = True
+except ImportError:
+    HEIF_SUPPORTED = False
+
 from gemini_webapi import GeminiClient
 from gemini_webapi.constants import Model
 from .models import UserGeminiConfig
@@ -64,17 +71,25 @@ def extract_text_from_image(request):
             }, status=500)
         
         image_data = None
+        original_format = None
         
         # Opción 1: Imagen enviada como archivo
         if request.FILES.get('image'):
             image_file = request.FILES['image']
+            original_format = image_file.content_type
             
-            # Validar tipo de archivo
+            # Tipos permitidos (ahora incluye HEIC si está instalado pillow-heif)
             allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
+            if HEIF_SUPPORTED:
+                allowed_types.extend(['image/heic', 'image/heif'])
+            
             if image_file.content_type not in allowed_types:
+                error_msg = f'Tipo no soportado: {image_file.content_type}. Tipos permitidos: {", ".join(allowed_types)}'
+                if not HEIF_SUPPORTED and image_file.content_type in ['image/heic', 'image/heif']:
+                    error_msg += '. HEIC detectado pero no soportado en el servidor. Envía la imagen en formato JPEG o PNG.'
                 return JsonResponse({
                     'success': False,
-                    'error': f'Tipo no soportado: {image_file.content_type}. Tipos permitidos: {", ".join(allowed_types)}'
+                    'error': error_msg
                 }, status=400)
             
             # Validar tamaño (máximo 10MB)
@@ -85,7 +100,26 @@ def extract_text_from_image(request):
                     'error': f'Archivo muy grande (max 10MB). Tamaño: {image_file.size / 1024 / 1024:.2f}MB'
                 }, status=400)
             
+            # Leer imagen
             image_data = image_file.read()
+            
+            # Si es HEIC/HEIF, convertir a JPEG automáticamente
+            if image_file.content_type in ['image/heic', 'image/heif']:
+                try:
+                    img = Image.open(BytesIO(image_data))
+                    # Convertir a RGB si es necesario
+                    if img.mode not in ('RGB', 'L'):
+                        img = img.convert('RGB')
+                    # Guardar como JPEG con buena calidad
+                    output = BytesIO()
+                    img.save(output, format='JPEG', quality=90, optimize=True)
+                    image_data = output.getvalue()
+                    original_format = f"{original_format} (convertido a JPEG)"
+                except Exception as e:
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'Error al convertir HEIC a JPEG: {str(e)}'
+                    }, status=400)
         
         # Opción 2: Imagen enviada como base64 en JSON
         elif request.content_type == 'application/json':
@@ -165,14 +199,20 @@ def extract_text_from_image(request):
         user_config.last_used = timezone.now()
         user_config.save(update_fields=['last_used'])
         
-        return JsonResponse({
+        response_data = {
             'success': True,
             'text': extracted_text,
             'message': 'Texto extraído exitosamente',
             'user': user_config.user.username,
             'telegram_user': user_config.telegram_user,
             'model_used': model
-        })
+        }
+        
+        # Agregar info de formato si fue convertido
+        if original_format:
+            response_data['image_format'] = original_format
+        
+        return JsonResponse(response_data)
         
     except Exception as e:
         return JsonResponse({
@@ -184,13 +224,6 @@ def extract_text_from_image(request):
 async def process_image_with_gemini(image_data: bytes, cookies: str, proxy: str = None, custom_prompt: str = None, model: str = None):
     """
     Procesa una imagen con Google Gemini y extrae el texto.
-    
-    Args:
-        image_data: Datos binarios de la imagen
-        cookies: Cookies de autenticación
-        proxy: Proxy opcional
-        custom_prompt: Prompt personalizado opcional
-        model: Modelo de Gemini a usar
     """
     client = GeminiClient(cookies=cookies, proxies=proxy, auto_close=False, auto_refresh=True)
     
@@ -212,7 +245,6 @@ Mantén el formato original. Responde SOLO con el texto extraído."""
         # Determinar el modelo a usar
         model_to_use = None
         if model and model != 'unspecified':
-            # Mapear string a constante de Model si es necesario
             model_map = {
                 'gemini-2.5-flash': Model.G_2_5_FLASH,
                 'gemini-2.5-pro': Model.G_2_5_PRO,
@@ -271,10 +303,15 @@ def api_status(request):
                 'error': 'Usuario no encontrado'
             }
     
+    # Verificar soporte HEIC
+    supported_formats = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
+    if HEIF_SUPPORTED:
+        supported_formats.extend(['image/heic', 'image/heif'])
+    
     return JsonResponse({
         'success': True,
         'service': 'OCR API with Google Gemini (Multi-User)',
-        'version': '2.1.0',
+        'version': '2.2.0',
         'authentication': 'telegram_user',
         'total_users_configured': total_users,
         'active_users': active_users,
@@ -283,7 +320,8 @@ def api_status(request):
             'extract_text': '/api/ocr/extract-text/',
             'status': '/api/ocr/status/'
         },
-        'supported_formats': ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'],
+        'supported_formats': supported_formats,
+        'heic_support': HEIF_SUPPORTED,
         'max_file_size': '10MB',
         'required_parameters': {
             'telegram_user': 'Username de Telegram del usuario (sin @)',
