@@ -3,3 +3,5 @@ mysqlclient>=2.2.0
 python-decouple>=3.8
 gunicorn>=21.2.0
 whitenoise>=6.5.0
+gemini-webapi>=1.16.0
+Pillow>=10.0.0
