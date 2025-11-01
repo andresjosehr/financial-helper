@@ -185,11 +185,13 @@ def extract_text_from_image(request):
         # Si no se especificó modelo en el request, usar el preferido del usuario
         if not model:
             model = user_config.preferred_model
+            
         
         # Procesar con Gemini usando las cookies del usuario
         extracted_text = asyncio.run(process_image_with_gemini(
             image_data=image_data,
-            cookies=user_config.cookies_string,
+            psid=user_config.gemini_psid,
+            psidts=user_config.gemini_psidts,
             proxy=user_config.proxy,
             custom_prompt=prompt,
             model=model
@@ -221,13 +223,33 @@ def extract_text_from_image(request):
         }, status=500)
 
 
-async def process_image_with_gemini(image_data: bytes, cookies: str, proxy: str = None, custom_prompt: str = None, model: str = None):
+async def process_image_with_gemini(image_data: bytes, psid: str, psidts: str, proxy: str = None, custom_prompt: str = None, model: str = None):
     """
     Procesa una imagen con Google Gemini y extrae el texto.
-    """
-    client = GeminiClient(cookies=cookies, proxies=proxy, auto_close=False, auto_refresh=True)
     
+    Args:
+        image_data: Datos binarios de la imagen
+        psid: Cookie __Secure-1PSID
+        psidts: Cookie __Secure-1PSIDTS
+        proxy: Proxy opcional
+        custom_prompt: Prompt personalizado opcional
+        model: Modelo de Gemini a usar
+    """
+    import tempfile
+    import os
+    
+    # Inicializar cliente con cookies individuales según documentación oficial
+    client = GeminiClient(psid, psidts, proxy=proxy)
+    await client.init(timeout=30, auto_close=False, auto_refresh=True)
+    
+    # Guardar imagen temporalmente (gemini-webapi requiere rutas de archivo)
+    temp_file = None
     try:
+        # Crear archivo temporal
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.jpg')
+        temp_file.write(image_data)
+        temp_file.close()
+        
         # Prompt por defecto
         if custom_prompt:
             prompt = custom_prompt
@@ -253,11 +275,11 @@ Mantén el formato original. Responde SOLO con el texto extraído."""
             }
             model_to_use = model_map.get(model.lower(), model)
         
-        # Generar contenido con o sin modelo especificado
+        # Generar contenido con archivo temporal
         if model_to_use:
-            response = await client.generate_content(prompt, image=image_data, model=model_to_use)
+            response = await client.generate_content(prompt, files=[temp_file.name], model=model_to_use)
         else:
-            response = await client.generate_content(prompt, image=image_data)
+            response = await client.generate_content(prompt, files=[temp_file.name])
         
         if response:
             return response.text
@@ -268,6 +290,12 @@ Mantén el formato original. Responde SOLO con el texto extraído."""
         raise Exception(f"Error Gemini: {str(e)}")
     
     finally:
+        # Limpiar archivo temporal
+        if temp_file and os.path.exists(temp_file.name):
+            try:
+                os.unlink(temp_file.name)
+            except:
+                pass
         await client.close()
 
 
