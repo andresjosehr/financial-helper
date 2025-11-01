@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'establishments',
     'products',
     'purchases',
+    'ocr',
 ]
 
 MIDDLEWARE = [
@@ -143,3 +144,11 @@ STATICFILES_DIRS = []
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Gemini API Configuration
+GEMINI_COOKIES = config('GEMINI_COOKIES', default='')
+GEMINI_PROXY = config('GEMINI_PROXY', default=None)
+
+# Media files (uploads)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
