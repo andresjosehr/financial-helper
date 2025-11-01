@@ -11,6 +11,7 @@ from django.views.decorators.http import require_http_methods
 from PIL import Image
 
 from gemini_webapi import GeminiClient
+from gemini_webapi.constants import Model
 from .models import UserGeminiConfig
 
 
@@ -136,12 +137,28 @@ def extract_text_from_image(request):
             except:
                 pass
         
+        # Obtener modelo si se proporciona (opcional, sino usa el del usuario)
+        model = None
+        if request.POST.get('model'):
+            model = request.POST.get('model')
+        elif request.content_type == 'application/json':
+            try:
+                body = json.loads(request.body)
+                model = body.get('model')
+            except:
+                pass
+        
+        # Si no se especificó modelo en el request, usar el preferido del usuario
+        if not model:
+            model = user_config.preferred_model
+        
         # Procesar con Gemini usando las cookies del usuario
         extracted_text = asyncio.run(process_image_with_gemini(
             image_data=image_data,
             cookies=user_config.cookies_string,
             proxy=user_config.proxy,
-            custom_prompt=prompt
+            custom_prompt=prompt,
+            model=model
         ))
         
         # Actualizar last_used
@@ -153,7 +170,8 @@ def extract_text_from_image(request):
             'text': extracted_text,
             'message': 'Texto extraído exitosamente',
             'user': user_config.user.username,
-            'telegram_user': user_config.telegram_user
+            'telegram_user': user_config.telegram_user,
+            'model_used': model
         })
         
     except Exception as e:
@@ -163,13 +181,21 @@ def extract_text_from_image(request):
         }, status=500)
 
 
-async def process_image_with_gemini(image_data: bytes, cookies: str, proxy: str = None, custom_prompt: str = None):
+async def process_image_with_gemini(image_data: bytes, cookies: str, proxy: str = None, custom_prompt: str = None, model: str = None):
     """
     Procesa una imagen con Google Gemini y extrae el texto.
+    
+    Args:
+        image_data: Datos binarios de la imagen
+        cookies: Cookies de autenticación
+        proxy: Proxy opcional
+        custom_prompt: Prompt personalizado opcional
+        model: Modelo de Gemini a usar
     """
     client = GeminiClient(cookies=cookies, proxies=proxy, auto_close=False, auto_refresh=True)
     
     try:
+        # Prompt por defecto
         if custom_prompt:
             prompt = custom_prompt
         else:
@@ -183,7 +209,23 @@ Si es un recibo o factura, incluye:
 - Método de pago
 Mantén el formato original. Responde SOLO con el texto extraído."""
         
-        response = await client.generate_content(prompt, image=image_data)
+        # Determinar el modelo a usar
+        model_to_use = None
+        if model and model != 'unspecified':
+            # Mapear string a constante de Model si es necesario
+            model_map = {
+                'gemini-2.5-flash': Model.G_2_5_FLASH,
+                'gemini-2.5-pro': Model.G_2_5_PRO,
+                'gemini-2.0-flash': 'gemini-2.0-flash',
+                'gemini-2.0-flash-thinking': 'gemini-2.0-flash-thinking',
+            }
+            model_to_use = model_map.get(model.lower(), model)
+        
+        # Generar contenido con o sin modelo especificado
+        if model_to_use:
+            response = await client.generate_content(prompt, image=image_data, model=model_to_use)
+        else:
+            response = await client.generate_content(prompt, image=image_data)
         
         if response:
             return response.text
@@ -219,6 +261,8 @@ def api_status(request):
                 'username': user_config.user.username,
                 'is_active': user_config.is_active,
                 'is_configured': bool(user_config.gemini_psid and user_config.gemini_psidts),
+                'preferred_model': user_config.preferred_model,
+                'model_display': user_config.get_preferred_model_display(),
                 'last_used': user_config.last_used.isoformat() if user_config.last_used else None
             }
         except UserGeminiConfig.DoesNotExist:
@@ -230,7 +274,7 @@ def api_status(request):
     return JsonResponse({
         'success': True,
         'service': 'OCR API with Google Gemini (Multi-User)',
-        'version': '2.0.0',
+        'version': '2.1.0',
         'authentication': 'telegram_user',
         'total_users_configured': total_users,
         'active_users': active_users,
@@ -243,7 +287,43 @@ def api_status(request):
         'max_file_size': '10MB',
         'required_parameters': {
             'telegram_user': 'Username de Telegram del usuario (sin @)',
-            'image': 'Archivo de imagen o image_base64',
-            'prompt': 'Prompt personalizado (opcional)'
-        }
+            'image': 'Archivo de imagen o image_base64'
+        },
+        'optional_parameters': {
+            'prompt': 'Prompt personalizado (sobrescribe el prompt por defecto)',
+            'model': 'Modelo de Gemini (sobrescribe el modelo preferido del usuario)'
+        },
+        'available_models': [
+            {
+                'value': 'gemini-2.5-flash',
+                'name': 'Gemini 2.5 Flash',
+                'description': 'Rápido y eficiente - Ideal para uso general',
+                'icon': '⚡'
+            },
+            {
+                'value': 'gemini-2.5-pro',
+                'name': 'Gemini 2.5 Pro',
+                'description': 'Más potente y preciso - Límite diario',
+                'icon': '🧠'
+            },
+            {
+                'value': 'gemini-2.0-flash',
+                'name': 'Gemini 2.0 Flash',
+                'description': 'Versión anterior',
+                'icon': '📦'
+            },
+            {
+                'value': 'gemini-2.0-flash-thinking',
+                'name': 'Gemini 2.0 Flash Thinking',
+                'description': 'Incluye proceso de razonamiento',
+                'icon': '💭'
+            },
+            {
+                'value': 'unspecified',
+                'name': 'Sin especificar',
+                'description': 'Usa modelo por defecto de Gemini',
+                'icon': '❓'
+            }
+        ],
+        'note': 'Si no se especifica "model" en el request, se usará el modelo preferido configurado por el usuario en el admin'
     })

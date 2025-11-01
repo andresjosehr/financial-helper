@@ -8,6 +8,16 @@ class UserGeminiConfig(models.Model):
     Configuración de Gemini por usuario.
     Cada usuario puede tener sus propias cookies de Gemini.
     """
+    
+    # Opciones de modelos disponibles
+    MODEL_CHOICES = [
+        ('gemini-2.5-flash', 'Gemini 2.5 Flash (Rápido y eficiente) ⚡'),
+        ('gemini-2.5-pro', 'Gemini 2.5 Pro (Más potente, límite diario) 🧠'),
+        ('gemini-2.0-flash', 'Gemini 2.0 Flash (Versión anterior)'),
+        ('gemini-2.0-flash-thinking', 'Gemini 2.0 Flash Thinking (Con razonamiento)'),
+        ('unspecified', 'Sin especificar (Usa modelo por defecto de Gemini)'),
+    ]
+    
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.OneToOneField(
         User, 
@@ -38,6 +48,15 @@ class UserGeminiConfig(models.Model):
         null=True,
         verbose_name='__Secure-1PAPISID',
         help_text='Cookie __Secure-1PAPISID de gemini.google.com (opcional)'
+    )
+    
+    # Modelo de Gemini preferido
+    preferred_model = models.CharField(
+        max_length=50,
+        choices=MODEL_CHOICES,
+        default='gemini-2.5-flash',
+        verbose_name='Modelo Preferido',
+        help_text='Modelo de Gemini que se usará por defecto para este usuario'
     )
     
     # Configuración adicional
@@ -73,7 +92,7 @@ class UserGeminiConfig(models.Model):
     
     def __str__(self):
         telegram = f" (@{self.telegram_user})" if self.telegram_user else ""
-        return f"{self.user.username}{telegram}"
+        return f"{self.user.username}{telegram} - {self.get_preferred_model_display()}"
     
     @property
     def cookies_string(self):

@@ -5,14 +5,27 @@ from .models import UserGeminiConfig
 
 @admin.register(UserGeminiConfig)
 class UserGeminiConfigAdmin(admin.ModelAdmin):
-    list_display = ['user', 'telegram_user', 'is_active', 'status_display', 'last_used', 'updated_at']
-    list_filter = ['is_active', 'created_at', 'updated_at']
+    list_display = ['user', 'telegram_user', 'preferred_model_badge', 'is_active', 'status_display', 'last_used', 'updated_at']
+    list_filter = ['is_active', 'preferred_model', 'created_at', 'updated_at']
     search_fields = ['user__username', 'user__email', 'telegram_user']
     readonly_fields = ['id', 'created_at', 'updated_at', 'last_used', 'cookies_preview']
     
     fieldsets = (
         ('Usuario', {
             'fields': ('user', 'telegram_user', 'is_active')
+        }),
+        ('Modelo de Gemini', {
+            'fields': ('preferred_model',),
+            'description': '''
+                <p><strong>Selecciona el modelo de Gemini que prefieres usar:</strong></p>
+                <ul>
+                    <li><strong>Gemini 2.5 Flash:</strong> Rápido y eficiente. Ideal para uso general. ⚡</li>
+                    <li><strong>Gemini 2.5 Pro:</strong> Más potente y preciso. Mejor para documentos complejos. (Límite diario) 🧠</li>
+                    <li><strong>Gemini 2.0 Flash:</strong> Versión anterior, aún funcional.</li>
+                    <li><strong>Gemini 2.0 Flash Thinking:</strong> Incluye proceso de razonamiento.</li>
+                    <li><strong>Sin especificar:</strong> Usa el modelo por defecto de tu cuenta de Gemini.</li>
+                </ul>
+            '''
         }),
         ('Cookies de Gemini', {
             'fields': ('gemini_psid', 'gemini_psidts', 'gemini_papisid'),
@@ -36,6 +49,35 @@ class UserGeminiConfigAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+    
+    def preferred_model_badge(self, obj):
+        """Muestra un badge con el modelo preferido"""
+        colors = {
+            'gemini-2.5-flash': '#4CAF50',  # Verde
+            'gemini-2.5-pro': '#2196F3',     # Azul
+            'gemini-2.0-flash': '#FF9800',   # Naranja
+            'gemini-2.0-flash-thinking': '#9C27B0',  # Púrpura
+            'unspecified': '#757575',        # Gris
+        }
+        
+        icons = {
+            'gemini-2.5-flash': '⚡',
+            'gemini-2.5-pro': '🧠',
+            'gemini-2.0-flash': '📦',
+            'gemini-2.0-flash-thinking': '💭',
+            'unspecified': '❓',
+        }
+        
+        color = colors.get(obj.preferred_model, '#757575')
+        icon = icons.get(obj.preferred_model, '')
+        model_name = obj.get_preferred_model_display()
+        
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 3px 8px; border-radius: 3px; font-size: 11px;">{} {}</span>',
+            color, icon, model_name.split('(')[0].strip()
+        )
+    
+    preferred_model_badge.short_description = 'Modelo'
     
     def status_display(self, obj):
         """Muestra el estado visual de la configuración"""
