@@ -36,10 +36,14 @@ class UserGeminiConfig(models.Model):
     
     # Cookies de Gemini
     gemini_psid = models.TextField(
+        blank=True,
+        null=True,
         verbose_name='__Secure-1PSID',
         help_text='Cookie __Secure-1PSID de gemini.google.com'
     )
     gemini_psidts = models.TextField(
+        blank=True,
+        null=True,
         verbose_name='__Secure-1PSIDTS',
         help_text='Cookie __Secure-1PSIDTS de gemini.google.com'
     )
