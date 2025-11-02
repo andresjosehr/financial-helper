@@ -8,12 +8,10 @@ def home(request):
         'message': 'Financial Helper API is running',
         'endpoints': {
             'admin': '/admin/',
-            'ocr_api': '/api/ocr/',
         }
     })
 
 urlpatterns = [
     path('', home, name='home'),
     path('admin/', admin.site.urls),
-    path('api/ocr/', include('ocr.urls')),
 ]
