@@ -26,8 +26,18 @@ from .models import UserGeminiConfig
 @require_http_methods(["POST"])
 def extract_text_from_image(request):
     """
-    Endpoint para extraer texto de una imagen usando Google Gemini.
-    Requiere el parámetro 'telegram_user' para identificar al usuario.
+    Endpoint para extraer texto de una imagen usando Google Gemini o generar texto sin imagen.
+    
+    Requiere:
+    - telegram_user: Username de Telegram del usuario
+    
+    Opcional:
+    - image: Archivo de imagen (si quieres OCR)
+    - image_base64: Imagen en base64 (alternativa a 'image')
+    - prompt: Prompt personalizado (si no se envía, usa el por defecto)
+    - model: Modelo de Gemini a usar (si no se envía, usa el preferido del usuario)
+    
+    Nota: Si no envías imagen, puedes usar esto para chat de texto con Gemini.
     """
     
     try:
@@ -121,44 +131,32 @@ def extract_text_from_image(request):
                         'error': f'Error al convertir HEIC a JPEG: {str(e)}'
                     }, status=400)
         
-        # Opción 2: Imagen enviada como base64 en JSON
+        # Opción 2: Imagen enviada como base64 en JSON (OPCIONAL)
         elif request.content_type == 'application/json':
             try:
                 body = json.loads(request.body)
                 image_base64 = body.get('image_base64', '')
                 
-                if not image_base64:
-                    return JsonResponse({
-                        'success': False,
-                        'error': 'Campo "image_base64" no encontrado en el JSON'
-                    }, status=400)
-                
-                # Remover el prefijo data:image si existe
-                if ',' in image_base64:
-                    image_base64 = image_base64.split(',')[1]
-                
-                image_data = base64.b64decode(image_base64)
+                if image_base64:
+                    # Remover el prefijo data:image si existe
+                    if ',' in image_base64:
+                        image_base64 = image_base64.split(',')[1]
+                    
+                    image_data = base64.b64decode(image_base64)
                 
             except json.JSONDecodeError:
                 return JsonResponse({'success': False, 'error': 'JSON inválido'}, status=400)
             except Exception as e:
                 return JsonResponse({'success': False, 'error': f'Error al decodificar: {str(e)}'}, status=400)
         
-        else:
-            return JsonResponse({
-                'success': False,
-                'error': 'Enviar imagen como archivo (multipart/form-data) o base64 (application/json)'
-            }, status=400)
-        
-        if not image_data:
-            return JsonResponse({'success': False, 'error': 'No se pudo leer imagen'}, status=400)
-        
-        # Validar que sea una imagen válida usando PIL
-        try:
-            img = Image.open(BytesIO(image_data))
-            img.verify()
-        except Exception as e:
-            return JsonResponse({'success': False, 'error': f'Imagen inválida: {str(e)}'}, status=400)
+        # Validar imagen solo si se proporcionó
+        if image_data:
+            # Validar que sea una imagen válida usando PIL
+            try:
+                img = Image.open(BytesIO(image_data))
+                img.verify()
+            except Exception as e:
+                return JsonResponse({'success': False, 'error': f'Imagen inválida: {str(e)}'}, status=400)
         
         # Obtener prompt personalizado si se proporciona
         prompt = None
@@ -204,10 +202,11 @@ def extract_text_from_image(request):
         response_data = {
             'success': True,
             'text': extracted_text,
-            'message': 'Texto extraído exitosamente',
+            'message': 'Texto generado exitosamente' if not image_data else 'Texto extraído exitosamente',
             'user': user_config.user.username,
             'telegram_user': user_config.telegram_user,
-            'model_used': model
+            'model_used': model,
+            'has_image': bool(image_data)
         }
         
         # Agregar info de formato si fue convertido
@@ -219,16 +218,16 @@ def extract_text_from_image(request):
     except Exception as e:
         return JsonResponse({
             'success': False,
-            'error': f'Error al procesar la imagen: {str(e)}'
+            'error': f'Error al procesar: {str(e)}'
         }, status=500)
 
 
-async def process_image_with_gemini(image_data: bytes, psid: str, psidts: str, proxy: str = None, custom_prompt: str = None, model: str = None):
+async def process_image_with_gemini(image_data: bytes = None, psid: str = None, psidts: str = None, proxy: str = None, custom_prompt: str = None, model: str = None):
     """
-    Procesa una imagen con Google Gemini y extrae el texto.
+    Procesa una imagen con Google Gemini y extrae el texto (o genera texto sin imagen).
     
     Args:
-        image_data: Datos binarios de la imagen
+        image_data: Datos binarios de la imagen (OPCIONAL - si no se pasa, es chat sin imagen)
         psid: Cookie __Secure-1PSID
         psidts: Cookie __Secure-1PSIDTS
         proxy: Proxy opcional
@@ -242,19 +241,15 @@ async def process_image_with_gemini(image_data: bytes, psid: str, psidts: str, p
     client = GeminiClient(psid, psidts, proxy=proxy)
     await client.init(timeout=30, auto_close=False, auto_refresh=True)
     
-    # Guardar imagen temporalmente (gemini-webapi requiere rutas de archivo)
     temp_file = None
     try:
-        # Crear archivo temporal
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.jpg')
-        temp_file.write(image_data)
-        temp_file.close()
-        
-        # Prompt por defecto
+        # Prompt por defecto o personalizado
         if custom_prompt:
             prompt = custom_prompt
         else:
-            prompt = """Extrae TODO el texto de esta imagen de manera estructurada.
+            if image_data:
+                # Prompt por defecto para OCR
+                prompt = """Extrae TODO el texto de esta imagen de manera estructurada.
 Si es un recibo o factura, incluye:
 - Nombre del establecimiento
 - Fecha y hora
@@ -263,6 +258,9 @@ Si es un recibo o factura, incluye:
 - Subtotales, impuestos y totales
 - Método de pago
 Mantén el formato original. Responde SOLO con el texto extraído."""
+            else:
+                # Si no hay imagen y no hay prompt, error
+                raise Exception("Debes proporcionar una imagen o un prompt de texto")
         
         # Determinar el modelo a usar
         model_to_use = None
@@ -275,11 +273,23 @@ Mantén el formato original. Responde SOLO con el texto extraído."""
             }
             model_to_use = model_map.get(model.lower(), model)
         
-        # Generar contenido con archivo temporal
-        if model_to_use:
-            response = await client.generate_content(prompt, files=[temp_file.name], model=model_to_use)
+        # Generar contenido con o sin imagen
+        if image_data:
+            # Guardar imagen temporalmente (gemini-webapi requiere rutas de archivo)
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.jpg')
+            temp_file.write(image_data)
+            temp_file.close()
+            
+            if model_to_use:
+                response = await client.generate_content(prompt, files=[temp_file.name], model=model_to_use)
+            else:
+                response = await client.generate_content(prompt, files=[temp_file.name])
         else:
-            response = await client.generate_content(prompt, files=[temp_file.name])
+            # Sin imagen, solo texto
+            if model_to_use:
+                response = await client.generate_content(prompt, model=model_to_use)
+            else:
+                response = await client.generate_content(prompt)
         
         if response:
             return response.text
