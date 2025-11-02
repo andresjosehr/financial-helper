@@ -24,7 +24,7 @@ services:
   web:
     build: .
     container_name: financial_helper_web
-    command: sh -c "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn --bind 0.0.0.0:8000 --workers 3 config.wsgi:application"
+    command: sh -c "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn --bind 0.0.0.0:8000 --workers 3 --timeout 360 config.wsgi:application"
     volumes:
       - .:/app
       - static_volume:/app/staticfiles

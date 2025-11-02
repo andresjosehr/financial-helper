@@ -195,5 +195,10 @@ LOGGING = {
             'level': 'ERROR',
             'propagate': False,
         },
+        'ocr': {
+            'handlers': ['file', 'console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
     },
 }

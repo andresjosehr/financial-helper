@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import json
+import logging
 from io import BytesIO
 from django.utils import timezone
 
@@ -9,6 +10,9 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from PIL import Image
+
+# Configurar logging
+logger = logging.getLogger(__name__)
 
 try:
     from pillow_heif import register_heif_opener
@@ -222,6 +226,34 @@ def extract_text_from_image(request):
         }, status=500)
 
 
+def extract_text_from_gemini_response(response_text: str) -> str:
+    """
+    Parsea manualmente la respuesta RAW de Gemini para extraer el texto.
+    La librería gemini-webapi falla al parsear, así que lo hacemos manual.
+    """
+    import re
+    
+    # Buscar el patrón ["rc_XXXXX",["TEXTO AQUI"
+    # El texto puede contener \n, \", etc. Usar DOTALL para capturar todo
+    pattern = r'\["rc_[a-f0-9]+",\["(.+?)"\]\]'
+    
+    matches = re.findall(pattern, response_text, re.DOTALL)
+    if matches:
+        # Tomar el texto más largo (suele ser la respuesta principal)
+        text = max(matches, key=len)
+        # Decodificar secuencias de escape
+        text = text.replace('\\n', '\n')
+        text = text.replace('\\t', '\t')
+        text = text.replace('\\"', '"')
+        text = text.replace('\\\\', '\\')
+        text = text.replace('\\u003e', '>')
+        text = text.replace('\\u003d', '=')
+        text = text.replace('\\u003c', '<')
+        return text
+    
+    return None
+
+
 async def process_image_with_gemini(image_data: bytes = None, psid: str = None, psidts: str = None, proxy: str = None, custom_prompt: str = None, model: str = None):
     """
     Procesa una imagen con Google Gemini y extrae el texto (o genera texto sin imagen).
@@ -236,10 +268,23 @@ async def process_image_with_gemini(image_data: bytes = None, psid: str = None, 
     """
     import tempfile
     import os
+    import httpx
     
     # Inicializar cliente con cookies individuales según documentación oficial
     client = GeminiClient(psid, psidts, proxy=proxy)
-    await client.init(timeout=30, auto_close=False, auto_refresh=True)
+    await client.init(timeout=300, auto_close=False, auto_refresh=True)
+    
+    # Interceptar el httpx client para capturar la respuesta RAW
+    original_post = client.client.post
+    raw_response_text = None
+    
+    async def intercept_post(*args, **kwargs):
+        nonlocal raw_response_text
+        response = await original_post(*args, **kwargs)
+        raw_response_text = response.text
+        return response
+    
+    client.client.post = intercept_post
     
     temp_file = None
     try:
@@ -273,28 +318,109 @@ Mantén el formato original. Responde SOLO con el texto extraído."""
             }
             model_to_use = model_map.get(model.lower(), model)
         
-        # Generar contenido con o sin imagen
-        if image_data:
-            # Guardar imagen temporalmente (gemini-webapi requiere rutas de archivo)
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.jpg')
-            temp_file.write(image_data)
-            temp_file.close()
-            
-            if model_to_use:
-                response = await client.generate_content(prompt, files=[temp_file.name], model=model_to_use)
-            else:
-                response = await client.generate_content(prompt, files=[temp_file.name])
-        else:
-            # Sin imagen, solo texto
-            if model_to_use:
-                response = await client.generate_content(prompt, model=model_to_use)
-            else:
-                response = await client.generate_content(prompt)
+        print(f"[OCR] Iniciando request a Gemini con modelo: {model_to_use or 'default'}", flush=True)
+        print(f"[OCR] Tiene imagen: {bool(image_data)}", flush=True)
         
-        if response:
-            return response.text
-        else:
-            raise Exception("No se recibió respuesta de Gemini")
+        # Generar contenido con o sin imagen
+        try:
+            if image_data:
+                # Guardar imagen temporalmente (gemini-webapi requiere rutas de archivo)
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.jpg')
+                temp_file.write(image_data)
+                temp_file.close()
+                
+                print(f"[OCR] Imagen temporal guardada en: {temp_file.name}", flush=True)
+                
+                if model_to_use:
+                    response = await client.generate_content(prompt, files=[temp_file.name], model=model_to_use)
+                else:
+                    response = await client.generate_content(prompt, files=[temp_file.name])
+            else:
+                # Sin imagen, solo texto
+                if model_to_use:
+                    response = await client.generate_content(prompt, model=model_to_use)
+                else:
+                    response = await client.generate_content(prompt)
+        except Exception as e:
+            print(f"[OCR ERROR] Excepción al llamar generate_content: {e}", flush=True)
+            print(f"[OCR ERROR] Tipo de excepción: {type(e)}", flush=True)
+            
+            # Si tenemos la respuesta RAW, intentar parsearla manualmente
+            if raw_response_text and 'Failed to parse response body' in str(e):
+                print(f"[OCR] Intentando parseo manual de respuesta RAW...", flush=True)
+                print(f"[OCR] Longitud de respuesta RAW: {len(raw_response_text)}", flush=True)
+                
+                extracted_text = extract_text_from_gemini_response(raw_response_text)
+                if extracted_text:
+                    print(f"[OCR] ✓ SUCCESS - Texto extraído manualmente (longitud: {len(extracted_text)})", flush=True)
+                    return extracted_text
+                else:
+                    print(f"[OCR ERROR] No se pudo extraer texto del parseo manual", flush=True)
+                    print(f"[OCR] Primeros 1000 chars de respuesta:", flush=True)
+                    print(raw_response_text[:1000], flush=True)
+            
+            import traceback
+            traceback.print_exc()
+            raise Exception(f"Error al llamar a Gemini: {str(e)}")
+        
+        print("=" * 80, flush=True)
+        print("[OCR] RESPUESTA COMPLETA DE GEMINI", flush=True)
+        print(f"[OCR] Tipo de respuesta: {type(response)}", flush=True)
+        print(f"[OCR] Response es None: {response is None}", flush=True)
+        print(f"[OCR] Response bool: {bool(response)}", flush=True)
+        
+        if response is None:
+            print("[OCR ERROR] Response es None!", flush=True)
+            raise Exception("Gemini retornó None - posible error de parseo en la librería")
+        
+        print(f"[OCR] Response tiene atributo 'text': {hasattr(response, 'text')}", flush=True)
+        print(f"[OCR] Response tiene atributo 'rcid': {hasattr(response, 'rcid')}", flush=True)
+        print(f"[OCR] Response tiene atributo 'candidates': {hasattr(response, 'candidates')}", flush=True)
+        print(f"[OCR] Response tiene atributo 'content': {hasattr(response, 'content')}", flush=True)
+        print(f"[OCR] Dir completo de respuesta:", flush=True)
+        print(dir(response), flush=True)
+        
+        # Intentar acceder a text y ver qué pasa
+        try:
+            text_value = response.text
+            print(f"[OCR] response.text = {text_value}", flush=True)
+            print(f"[OCR] response.text es None: {text_value is None}", flush=True)
+            print(f"[OCR] response.text bool: {bool(text_value)}", flush=True)
+            if text_value:
+                print(f"[OCR] ✓ SUCCESS - Texto tiene longitud: {len(str(text_value))}", flush=True)
+                print("=" * 80, flush=True)
+                return text_value
+            else:
+                print(f"[OCR ERROR] response.text existe pero está vacío o es None", flush=True)
+        except AttributeError as e:
+            print(f"[OCR ERROR] No existe response.text: {e}", flush=True)
+        except Exception as e:
+            print(f"[OCR ERROR] Error al acceder response.text: {e}", flush=True)
+        
+        # Intentar con rcid/candidates
+        try:
+            if hasattr(response, 'rcid'):
+                print(f"[OCR] ✓ Objeto tiene rcid: {response.rcid}", flush=True)
+                if hasattr(response, 'candidates') and response.candidates:
+                    print(f"[OCR] Candidates encontrados: {len(response.candidates)}", flush=True)
+                    first_candidate = response.candidates[0]
+                    print(f"[OCR] Candidate[0] type: {type(first_candidate)}", flush=True)
+                    print(f"[OCR] Candidate[0] dir: {dir(first_candidate)}", flush=True)
+                    if hasattr(first_candidate, 'text'):
+                        print(f"[OCR] ✓ Usando candidate[0].text", flush=True)
+                        print("=" * 80, flush=True)
+                        return first_candidate.text
+        except Exception as e:
+            print(f"[OCR ERROR] Error con rcid/candidates: {e}", flush=True)
+        
+        # Intentar convertir a string y buscar patrón
+        print(f"[OCR] Último intento: convertir a string", flush=True)
+        response_str = str(response)
+        print(f"[OCR] Response como string (primeros 1000 chars):", flush=True)
+        print(response_str[:1000], flush=True)
+        print("=" * 80, flush=True)
+        
+        raise Exception(f"No se pudo extraer texto. Response type: {type(response)}, tiene text: {hasattr(response, 'text')}")
             
     except Exception as e:
         raise Exception(f"Error Gemini: {str(e)}")
