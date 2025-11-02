@@ -35,3 +35,4 @@ Thumbs.db
 # Database
 *.sql
 *.sqlite
+logs/*.log
