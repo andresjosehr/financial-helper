@@ -18,7 +18,6 @@ class Purchase(models.Model):
 
     # Totals in VES
     subtotal_ves = models.DecimalField(max_digits=15, decimal_places=2, verbose_name='Subtotal (VES)')
-    discount_ves = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name='Descuento (VES)')
     total_ves = models.DecimalField(max_digits=15, decimal_places=2, verbose_name='Total (VES)')
 
     # Exchange rates snapshot
@@ -33,18 +32,12 @@ class Purchase(models.Model):
     tax_ves = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name='Impuesto (VES)')
     tax_type = models.CharField(max_length=50, blank=True, null=True, verbose_name='Tipo de Impuesto')
     tax_percentage = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True, verbose_name='Porcentaje de Impuesto')
-    tax_base = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True, verbose_name='Base Imponible')
 
     # Payment info
     payment_method = models.CharField(max_length=50, blank=True, null=True, verbose_name='Método de Pago')
     payment_reference = models.CharField(max_length=255, blank=True, null=True, verbose_name='Referencia de Pago')
-    bank_name = models.CharField(max_length=255, blank=True, null=True, verbose_name='Banco')
-    card_last_digits = models.CharField(max_length=4, blank=True, null=True, verbose_name='Últimos 4 Dígitos')
-    tip_ves = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name='Propina (VES)')
 
     # Additional info
-    cashier = models.CharField(max_length=100, blank=True, null=True, verbose_name='Cajero')
-    vendor = models.CharField(max_length=100, blank=True, null=True, verbose_name='Vendedor')
     register_number = models.CharField(max_length=50, blank=True, null=True, verbose_name='Número de Caja')
     notes = models.TextField(blank=True, null=True, verbose_name='Notas')
 
@@ -85,11 +78,6 @@ class PurchaseItem(models.Model):
     total_ves = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name='Total (VES)')
     total_usd_bcv = models.DecimalField(max_digits=15, decimal_places=4, blank=True, null=True, verbose_name='Total USD (BCV)')
     total_usd_binance = models.DecimalField(max_digits=15, decimal_places=4, blank=True, null=True, verbose_name='Total USD (Binance)')
-
-    # Normalized price per standard unit
-    price_per_unit_ves = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True, verbose_name='Precio/Unidad Std (VES)')
-    price_per_unit_usd_bcv = models.DecimalField(max_digits=15, decimal_places=4, blank=True, null=True, verbose_name='Precio/Unidad Std USD (BCV)')
-    price_per_unit_usd_binance = models.DecimalField(max_digits=15, decimal_places=4, blank=True, null=True, verbose_name='Precio/Unidad Std USD (Binance)')
 
     notes = models.TextField(blank=True, null=True, verbose_name='Notas')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de Creación')
