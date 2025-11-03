@@ -11,8 +11,6 @@ class Purchase(models.Model):
     establishment = models.ForeignKey(Establishment, on_delete=models.SET_NULL, null=True, blank=True, related_name='purchases', verbose_name='Establecimiento')
 
     # Document metadata
-    document_type = models.CharField(max_length=50, verbose_name='Tipo de Documento')
-    document_number = models.CharField(max_length=100, blank=True, null=True, verbose_name='Número de Documento')
     purchase_date = models.DateField(verbose_name='Fecha de Compra')
     purchase_time = models.TimeField(blank=True, null=True, verbose_name='Hora de Compra')
 
@@ -33,12 +31,7 @@ class Purchase(models.Model):
     tax_type = models.CharField(max_length=50, blank=True, null=True, verbose_name='Tipo de Impuesto')
     tax_percentage = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True, verbose_name='Porcentaje de Impuesto')
 
-    # Payment info
-    payment_method = models.CharField(max_length=50, blank=True, null=True, verbose_name='Método de Pago')
-    payment_reference = models.CharField(max_length=255, blank=True, null=True, verbose_name='Referencia de Pago')
-
     # Additional info
-    register_number = models.CharField(max_length=50, blank=True, null=True, verbose_name='Número de Caja')
     notes = models.TextField(blank=True, null=True, verbose_name='Notas')
 
     # Original JSON
