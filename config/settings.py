@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'products',
     'purchases',
     'users',
+    'image_processor',
 ]
 
 MIDDLEWARE = [

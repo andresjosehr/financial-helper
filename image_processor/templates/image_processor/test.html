@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Procesador de Facturas - Prueba</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .upload-section {
+            margin-bottom: 40px;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .file-input-wrapper input[type="file"] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .file-input-label {
+            display: block;
+            padding: 30px;
+            background: #f8f9fa;
+            border: 3px dashed #667eea;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .file-input-label:hover {
+            background: #e9ecef;
+            border-color: #764ba2;
+        }
+
+        .file-input-label.drag-over {
+            background: #667eea;
+            color: white;
+            border-color: white;
+        }
+
+        .file-name {
+            margin-top: 10px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 15px 30px;
+            font-size: 1em;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .btn-process {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            flex: 1;
+        }
+
+        .btn-process:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-process:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-download {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-download:hover {
+            background: #218838;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(40, 167, 69, 0.4);
+        }
+
+        .btn-clear {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-clear:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(220, 53, 69, 0.4);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results {
+            display: none;
+            margin-top: 40px;
+        }
+
+        .results.active {
+            display: block;
+        }
+
+        .image-comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .image-comparison {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .image-box {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .image-box h3 {
+            margin-bottom: 15px;
+            color: #667eea;
+            font-size: 1.3em;
+        }
+
+        .image-box img {
+            width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        }
+
+        .image-info {
+            margin-top: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            font-size: 0.9em;
+        }
+
+        .image-info p {
+            margin: 5px 0;
+            color: #555;
+        }
+
+        .error {
+            display: none;
+            background: #f8d7da;
+            color: #721c24;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            border: 1px solid #f5c6cb;
+        }
+
+        .error.active {
+            display: block;
+        }
+
+        .success-badge {
+            display: inline-block;
+            background: #28a745;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>\ud83d\udcdd Procesador de Facturas</h1>
+            <p>Optimiza imágenes de facturas para procesamiento con IA</p>
+        </div>
+
+        <div class="content">
+            <div class="upload-section">
+                <h2>1. Selecciona una imagen de factura</h2>
+                <div class="file-input-wrapper">
+                    <input type="file" id="fileInput" accept="image/*">
+                    <label for="fileInput" class="file-input-label" id="dropZone">
+                        <div style="font-size: 3em; margin-bottom: 10px;">\ud83d\udcf7</div>
+                        <div style="font-size: 1.2em; font-weight: bold;">Haz clic o arrastra una imagen aquí</div>
+                        <div style="margin-top: 10px; opacity: 0.7;">Formatos: JPG, PNG, GIF, WEBP</div>
+                    </label>
+                </div>
+                <div class="file-name" id="fileName"></div>
+
+                <div class="buttons">
+                    <button class="btn-process" id="processBtn" disabled>
+                        \ud83d\ude80 Procesar Factura
+                    </button>
+                    <button class="btn-download" id="downloadBtn" style="display: none;">
+                        \ud83d\udcbe Descargar Imagen Procesada
+                    </button>
+                    <button class="btn-clear" id="clearBtn" style="display: none;">
+                        \ud83d\udd04 Limpiar y Nueva Imagen
+                    </button>
+                </div>
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p style="font-size: 1.1em; color: #667eea; font-weight: bold;">Procesando imagen...</p>
+                <p style="color: #666; margin-top: 10px;">Detectando factura, optimizando contraste y mejorando legibilidad</p>
+            </div>
+
+            <div class="error" id="error"></div>
+
+            <div class="results" id="results">
+                <h2>2. Resultados <span class="success-badge" id="successBadge">\u2714 Procesado</span></h2>
+                <div class="image-comparison">
+                    <div class="image-box">
+                        <h3>\ud83d\uddbc\ufe0f Imagen Original</h3>
+                        <img id="originalImg" alt="Imagen original">
+                        <div class="image-info">
+                            <p><strong>Tamaño:</strong> <span id="originalSize">-</span></p>
+                        </div>
+                    </div>
+
+                    <div class="image-box">
+                        <h3>\u2728 Imagen Procesada</h3>
+                        <img id="processedImg" alt="Imagen procesada">
+                        <div class="image-info">
+                            <p><strong>Tamaño:</strong> <span id="processedSize">-</span></p>
+                            <p><strong>Optimizaciones:</strong></p>
+                            <ul style="margin-left: 20px; margin-top: 5px;">
+                                <li>Recorte automático de factura</li>
+                                <li>Conversión a blanco y negro</li>
+                                <li>Aumento de contraste</li>
+                                <li>Umbralización adaptativa (Otsu)</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const fileName = document.getElementById('fileName');
+        const processBtn = document.getElementById('processBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const loading = document.getElementById('loading');
+        const error = document.getElementById('error');
+        const results = document.getElementById('results');
+        const dropZone = document.getElementById('dropZone');
+        const originalImg = document.getElementById('originalImg');
+        const processedImg = document.getElementById('processedImg');
+        const originalSize = document.getElementById('originalSize');
+        const processedSize = document.getElementById('processedSize');
+
+        let selectedFile = null;
+        let processedImageData = null;
+
+        // Drag and drop
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-over');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                handleFileSelect();
+            }
+        });
+
+        fileInput.addEventListener('change', handleFileSelect);
+
+        function handleFileSelect() {
+            const file = fileInput.files[0];
+            if (file) {
+                selectedFile = file;
+                fileName.textContent = `\u2705 Archivo seleccionado: ${file.name} (${formatFileSize(file.size)})`;
+                processBtn.disabled = false;
+
+                // Preview original
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    originalImg.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        processBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            // Reset UI
+            error.classList.remove('active');
+            results.classList.remove('active');
+            loading.classList.add('active');
+            processBtn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('image', selectedFile);
+            formData.append('format', 'base64');
+
+            try {
+                const response = await fetch('/api/process-invoice/', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    // Success!
+                    processedImageData = data.image;
+                    processedImg.src = data.image;
+                    originalSize.textContent = data.original_size;
+                    processedSize.textContent = data.processed_size;
+
+                    results.classList.add('active');
+                    downloadBtn.style.display = 'inline-block';
+                    clearBtn.style.display = 'inline-block';
+                } else {
+                    throw new Error(data.error || 'Error al procesar la imagen');
+                }
+            } catch (err) {
+                error.textContent = `\u274c Error: ${err.message}`;
+                error.classList.add('active');
+                processBtn.disabled = false;
+            } finally {
+                loading.classList.remove('active');
+            }
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            if (!processedImageData) return;
+
+            // Convert base64 to blob and download
+            const link = document.createElement('a');
+            link.href = processedImageData;
+            link.download = 'factura_procesada.png';
+            link.click();
+        });
+
+        clearBtn.addEventListener('click', () => {
+            fileInput.value = '';
+            fileName.textContent = '';
+            selectedFile = null;
+            processedImageData = null;
+            processBtn.disabled = true;
+            downloadBtn.style.display = 'none';
+            clearBtn.style.display = 'none';
+            results.classList.remove('active');
+            error.classList.remove('active');
+            originalImg.src = '';
+            processedImg.src = '';
+        });
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        }
+    </script>
+</body>
+</html>

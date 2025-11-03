@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ajuste de Parámetros - Procesador de Facturas</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            padding: 20px;
+            min-height: 80vh;
+        }
+
+        .controls {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            overflow-y: auto;
+            max-height: 85vh;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .control-group:last-child {
+            border-bottom: none;
+        }
+
+        .control-group h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+
+        .control-item {
+            margin-bottom: 15px;
+        }
+
+        .control-item label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+            font-size: 0.9em;
+        }
+
+        .control-item input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 5px;
+            background: #d3d3d3;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .control-item input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+        }
+
+        .control-item input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+        }
+
+        .value-display {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .upload-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .file-input-wrapper input[type="file"] {
+            display: none;
+        }
+
+        .file-input-label {
+            display: inline-block;
+            padding: 12px 30px;
+            background: #667eea;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .file-input-label:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+        }
+
+        .file-name {
+            margin-top: 10px;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            font-size: 0.95em;
+        }
+
+        .btn-process {
+            background: #667eea;
+            color: white;
+            flex: 1;
+        }
+
+        .btn-process:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+        }
+
+        .btn-process:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-reset {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-reset:hover {
+            background: #5a6268;
+        }
+
+        .btn-download {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-download:hover {
+            background: #218838;
+        }
+
+        .images-section {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .images-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 1200px) {
+            .images-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .image-box {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .image-box h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .image-box img {
+            max-width: 100%;
+            max-height: 70vh;
+            border-radius: 8px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+            grid-column: 1 / -1;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            display: none;
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .error.active {
+            display: block;
+        }
+
+        .preset-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .btn-preset {
+            padding: 6px 12px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85em;
+        }
+
+        .btn-preset:hover {
+            background: #5a6268;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏛️ Ajuste de Parámetros en Tiempo Real</h1>
+            <p>Ajusta los valores y ve los resultados instantáneamente</p>
+        </div>
+
+        <div class="content">
+            <!-- Panel de controles -->
+            <div class="controls">
+                <div class="upload-section">
+                    <div class="file-input-wrapper">
+                        <input type="file" id="fileInput" accept="image/*">
+                        <label for="fileInput" class="file-input-label">
+                            📷 Seleccionar Imagen
+                        </label>
+                    </div>
+                    <div class="file-name" id="fileName"></div>
+                </div>
+
+                <div class="buttons">
+                    <button class="btn-process" id="processBtn" disabled>
+                        🚀 Procesar
+                    </button>
+                    <button class="btn-reset" id="resetBtn">
+                        🔄 Reset
+                    </button>
+                </div>
+
+                <button class="btn-download" id="downloadBtn" style="display: none; width: 100%; margin-bottom: 20px;">
+                    💾 Descargar Resultado
+                </button>
+
+                <!-- Presets -->
+                <div class="control-group">
+                    <h3>✨ Presets</h3>
+                    <div class="preset-buttons">
+                        <button class="btn-preset" onclick="applyPreset('optimal')">Óptimo</button>
+                        <button class="btn-preset" onclick="applyPreset('balanced')">Balanceado</button>
+                        <button class="btn-preset" onclick="applyPreset('aggressive')">Agresivo</button>
+                        <button class="btn-preset" onclick="applyPreset('clean')">Limpio</button>
+                    </div>
+                </div>
+
+                <!-- Controles de preprocesamiento -->
+                <div class="control-group">
+                    <h3>🧹 Preprocesamiento</h3>
+                    
+                    <div class="control-item">
+                        <label>
+                            Median Blur (ruido sal/pimienta)
+                            <span class="value-display" id="val_median_blur">1</span>
+                        </label>
+                        <input type="range" id="median_blur" min="1" max="15" step="2" value="1">
+                    </div>
+
+                    <div class="control-item">
+                        <label>
+                            Bilateral Filter D
+                            <span class="value-display" id="val_bilateral_d">14</span>
+                        </label>
+                        <input type="range" id="bilateral_d" min="0" max="15" step="1" value="14">
+                    </div>
+
+                    <div class="control-item">
+                        <label>
+                            Bilateral Sigma
+                            <span class="value-display" id="val_bilateral_sigma">100</span>
+                        </label>
+                        <input type="range" id="bilateral_sigma" min="10" max="150" step="10" value="100">
+                    </div>
+
+                    <div class="control-item">
+                        <label>
+                            CLAHE Clip Limit
+                            <span class="value-display" id="val_clahe_clip">0</span>
+                        </label>
+                        <input type="range" id="clahe_clip" min="0" max="10" step="0.5" value="0">
+                    </div>
+
+                    <div class="control-item">
+                        <label>
+                            CLAHE Grid Size
+                            <span class="value-display" id="val_clahe_grid">4</span>
+                        </label>
+                        <input type="range" id="clahe_grid" min="4" max="16" step="2" value="4">
+                    </div>
+                </div>
+
+                <!-- Controles de recorte -->
+                <div class="control-group">
+                    <h3>✂️ Recorte</h3>
+                    
+                    <div class="control-item checkbox-item">
+                        <input type="checkbox" id="skip_crop">
+                        <label for="skip_crop">Omitir recorte automático</label>
+                    </div>
+                </div>
+
+                <!-- Controles de mejora -->
+                <div class="control-group">
+                    <h3>✨ Mejora</h3>
+                    
+                    <div class="control-item">
+                        <label>
+                            Gaussian Blur
+                            <span class="value-display" id="val_gaussian_blur">6</span>
+                        </label>
+                        <input type="range" id="gaussian_blur" min="0" max="15" step="2" value="6">
+                    </div>
+
+                    <div class="control-item">
+                        <label>
+                            Sharpness
+                            <span class="value-display" id="val_sharpness">0</span>
+                        </label>
+                        <input type="range" id="sharpness" min="0" max="3" step="0.1" value="0">
+                    </div>
+                </div>
+
+                <!-- Controles de umbralización -->
+                <div class="control-group">
+                    <h3>🎯 Umbralización Adaptativa</h3>
+                    
+                    <div class="control-item">
+                        <label>
+                            Block Size (ventana)
+                            <span class="value-display" id="val_adaptive_block">17</span>
+                        </label>
+                        <input type="range" id="adaptive_block" min="3" max="51" step="2" value="17">
+                    </div>
+
+                    <div class="control-item">
+                        <label>
+                            C (constante)
+                            <span class="value-display" id="val_adaptive_c">2</span>
+                        </label>
+                        <input type="range" id="adaptive_c" min="-20" max="20" step="1" value="2">
+                    </div>
+                </div>
+
+                <!-- Controles morfológicos -->
+                <div class="control-group">
+                    <h3>🔍 Operaciones Morfológicas</h3>
+                    
+                    <div class="control-item">
+                        <label>
+                            Morphology Open (eliminar ruido blanco)
+                            <span class="value-display" id="val_morph_open">0</span>
+                        </label>
+                        <input type="range" id="morph_open" min="0" max="5" step="1" value="0">
+                    </div>
+
+                    <div class="control-item">
+                        <label>
+                            Morphology Close (eliminar ruido negro)
+                            <span class="value-display" id="val_morph_close">0</span>
+                        </label>
+                        <input type="range" id="morph_close" min="0" max="5" step="1" value="0">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Área de imágenes -->
+            <div class="images-section">
+                <div class="error" id="error"></div>
+
+                <div class="images-container">
+                    <div class="image-box">
+                        <h3>🖼️ Imagen Original</h3>
+                        <img id="originalImg" src="" alt="Selecciona una imagen">
+                    </div>
+
+                    <div class="loading" id="loading">
+                        <div class="spinner"></div>
+                        <p><strong>Procesando...</strong></p>
+                    </div>
+
+                    <div class="image-box" id="resultBox" style="display: none;">
+                        <h3>✨ Resultado Procesado</h3>
+                        <img id="processedImg" src="" alt="">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+        let processedImageData = null;
+
+        const fileInput = document.getElementById('fileInput');
+        const fileName = document.getElementById('fileName');
+        const processBtn = document.getElementById('processBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const originalImg = document.getElementById('originalImg');
+        const processedImg = document.getElementById('processedImg');
+        const loading = document.getElementById('loading');
+        const error = document.getElementById('error');
+        const resultBox = document.getElementById('resultBox');
+
+        const controls = [
+            'median_blur', 'bilateral_d', 'bilateral_sigma',
+            'clahe_clip', 'clahe_grid', 'adaptive_block', 'adaptive_c',
+            'gaussian_blur', 'morph_open', 'morph_close', 'sharpness'
+        ];
+
+        controls.forEach(id => {
+            const input = document.getElementById(id);
+            const display = document.getElementById(`val_${id}`);
+            
+            input.addEventListener('input', () => {
+                display.textContent = input.value;
+                if (selectedFile) {
+                    autoProcess();
+                }
+            });
+        });
+
+        document.getElementById('skip_crop').addEventListener('change', () => {
+            if (selectedFile) autoProcess();
+        });
+
+        fileInput.addEventListener('change', () => {
+            const file = fileInput.files[0];
+            if (file) {
+                selectedFile = file;
+                fileName.textContent = `✅ ${file.name}`;
+                processBtn.disabled = false;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    originalImg.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        processBtn.addEventListener('click', processImage);
+
+        resetBtn.addEventListener('click', () => {
+            applyPreset('optimal');
+            if (selectedFile) autoProcess();
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            if (!processedImageData) return;
+            const link = document.createElement('a');
+            link.href = processedImageData;
+            link.download = 'factura_procesada.png';
+            link.click();
+        });
+
+        async function autoProcess() {
+            await processImage();
+        }
+
+        async function processImage() {
+            if (!selectedFile) return;
+
+            error.classList.remove('active');
+            loading.classList.add('active');
+            resultBox.style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('image', selectedFile);
+
+            controls.forEach(id => {
+                formData.append(id, document.getElementById(id).value);
+            });
+            formData.append('skip_crop', document.getElementById('skip_crop').checked);
+
+            try {
+                const response = await fetch('/api/process-with-params/', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    processedImageData = data.image;
+                    processedImg.src = data.image;
+                    resultBox.style.display = 'block';
+                    downloadBtn.style.display = 'block';
+                } else {
+                    throw new Error(data.error || 'Error al procesar');
+                }
+            } catch (err) {
+                error.textContent = `❌ Error: ${err.message}`;
+                error.classList.add('active');
+            } finally {
+                loading.classList.remove('active');
+            }
+        }
+
+        function applyPreset(preset) {
+            const presets = {
+                optimal: {
+                    median_blur: 1, bilateral_d: 14, bilateral_sigma: 100,
+                    clahe_clip: 0, clahe_grid: 4, adaptive_block: 17,
+                    adaptive_c: 2, gaussian_blur: 6, morph_open: 0,
+                    morph_close: 0, sharpness: 0
+                },
+                balanced: {
+                    median_blur: 3, bilateral_d: 5, bilateral_sigma: 50,
+                    clahe_clip: 2.0, clahe_grid: 8, adaptive_block: 11,
+                    adaptive_c: 2, gaussian_blur: 6, morph_open: 0,
+                    morph_close: 0, sharpness: 0
+                },
+                aggressive: {
+                    median_blur: 5, bilateral_d: 9, bilateral_sigma: 75,
+                    clahe_clip: 4.0, clahe_grid: 8, adaptive_block: 31,
+                    adaptive_c: 15, gaussian_blur: 5, morph_open: 2,
+                    morph_close: 2, sharpness: 1.5
+                },
+                clean: {
+                    median_blur: 5, bilateral_d: 7, bilateral_sigma: 60,
+                    clahe_clip: 2.5, clahe_grid: 8, adaptive_block: 21,
+                    adaptive_c: 8, gaussian_blur: 3, morph_open: 1,
+                    morph_close: 1, sharpness: 1.2
+                }
+            };
+
+            const values = presets[preset];
+            Object.keys(values).forEach(key => {
+                const input = document.getElementById(key);
+                input.value = values[key];
+                document.getElementById(`val_${key}`).textContent = values[key];
+            });
+        }
+
+        controls.forEach(id => {
+            const input = document.getElementById(id);
+            const display = document.getElementById(`val_${id}`);
+            display.textContent = input.value;
+        });
+    </script>
+</body>
+</html>
