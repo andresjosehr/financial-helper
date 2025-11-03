@@ -12,7 +12,7 @@ class ProductCategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ['normalized_name', 'brand', 'category', 'unit_type', 'created_at']
-    list_filter = ['category', 'unit_type', 'brand']
+    list_display = ['normalized_name', 'brand', 'category', 'created_at']
+    list_filter = ['category', 'brand']
     search_fields = ['normalized_name', 'brand', 'description']
     readonly_fields = ['id', 'created_at', 'updated_at']
