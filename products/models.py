@@ -59,8 +59,8 @@ class ProductCategory(models.Model):
 
 class Product(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=255, verbose_name='Nombre')
-    brand = models.ForeignKey(ProductBrand, on_delete=models.SET_NULL, null=True, blank=True, related_name='products', verbose_name='Marca')
+    name = models.CharField(max_length=255, unique=True, verbose_name='Nombre')
+    brands = models.ManyToManyField(ProductBrand, related_name='products', blank=True, verbose_name='Marcas')
     category = models.ForeignKey(ProductCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='products', verbose_name='Categoría')
     variants = models.ManyToManyField('ProductVariant', through='ProductVariantAssignment', related_name='products', verbose_name='Variantes')
     description = models.TextField(blank=True, null=True, verbose_name='Descripción')
@@ -71,18 +71,17 @@ class Product(models.Model):
         db_table = 'products'
         verbose_name = 'Producto'
         verbose_name_plural = 'Productos'
-        ordering = ['name', 'brand']
+        ordering = ['name']
         indexes = [
             models.Index(fields=['category'], name='idx_products_category'),
             models.Index(fields=['name'], name='idx_products_name'),
-            models.Index(fields=['brand'], name='idx_products_brand'),
         ]
 
     def __str__(self):
-        parts = [self.name]
-        if self.brand:
-            parts.append(f"({self.brand.name})")
-        return ' '.join(parts)
+        brands_str = ', '.join([b.name for b in self.brands.all()[:3]])
+        if brands_str:
+            return f"{self.name} ({brands_str})"
+        return self.name
 
 
 class ProductVariantAssignment(models.Model):

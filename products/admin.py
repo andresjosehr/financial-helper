@@ -33,8 +33,9 @@ class ProductVariantAssignmentInline(admin.TabularInline):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ['name', 'brand', 'category', 'created_at']
-    list_filter = ['category', 'brand']
-    search_fields = ['name', 'brand__name', 'description']
+    list_display = ['name', 'category', 'created_at']
+    list_filter = ['category', 'brands']
+    search_fields = ['name', 'brands__name', 'description']
+    filter_horizontal = ['brands']
     readonly_fields = ['id', 'created_at', 'updated_at']
     inlines = [ProductVariantAssignmentInline]

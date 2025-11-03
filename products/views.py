@@ -18,18 +18,13 @@ def get_products_by_categories(request):
             {
                 "id": "uuid",
                 "name": "Mantequilla",
-                "brand": "Mavesa",
+                "brands": ["Mavesa", "Primor"],
                 "category": "Lácteos",
                 "variants": [
                     {"type": "size", "value": "200gm"},
                     {"type": "version", "value": "Light"}
                 ]
             }
-        ],
-        "marcas": ["Mavesa", "Primor", "Coca-Cola"],
-        "variantes": [
-            {"type": "size", "value": "200gm"},
-            {"type": "version", "value": "Light"}
         ]
     }
     """
@@ -38,9 +33,7 @@ def get_products_by_categories(request):
 
     if not categories_param:
         return JsonResponse({
-            'productos': [],
-            'marcas': [],
-            'variantes': []
+            'productos': []
         })
 
     # Parsear categorías
@@ -49,7 +42,7 @@ def get_products_by_categories(request):
     # Consultar productos filtrados por categorías
     products = Product.objects.filter(
         category__name__in=categories
-    ).select_related('brand', 'category').prefetch_related('variants')
+    ).select_related('category').prefetch_related('brands', 'variants')
 
     # Serializar productos
     productos_data = []
@@ -62,29 +55,16 @@ def get_products_by_categories(request):
             for variant in product.variants.all()
         ]
 
+        brands_data = [brand.name for brand in product.brands.all()]
+
         productos_data.append({
             'id': str(product.id),
             'name': product.name,
-            'brand': product.brand.name if product.brand else None,
+            'brands': brands_data,
             'category': product.category.name if product.category else None,
             'variants': variants_data
         })
 
-    # Obtener todas las marcas
-    marcas = list(
-        ProductBrand.objects.values_list('name', flat=True).order_by('name')
-    )
-
-    # Obtener todas las variantes
-    variantes_data = []
-    for variant in ProductVariant.objects.all().order_by('type', 'value'):
-        variantes_data.append({
-            'type': variant.type,
-            'value': variant.value
-        })
-
     return JsonResponse({
-        'productos': productos_data,
-        'marcas': marcas,
-        'variantes': variantes_data
+        'productos': productos_data
     })
