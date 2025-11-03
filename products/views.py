@@ -1,16 +1,20 @@
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
 from .models import Product, ProductBrand, ProductVariant
+import json
 
 
-@require_http_methods(["GET"])
+@csrf_exempt
+@require_http_methods(["POST"])
 def get_products_by_categories(request):
     """
     Endpoint para obtener productos filtrados por categorías.
 
-    Query params:
-    - categories: Lista de nombres de categorías separadas por coma
-      Ejemplo: ?categories=Bebidas,Lácteos,Carnes
+    Body JSON:
+    {
+        "categories": ["Bebidas", "Lácteos", "Carnes"]
+    }
 
     Returns:
     {
@@ -28,16 +32,22 @@ def get_products_by_categories(request):
         ]
     }
     """
-    # Obtener parámetro de categorías
-    categories_param = request.GET.get('categories', '')
+    try:
+        # Parsear body JSON
+        body = json.loads(request.body)
+        categories = body.get('categories', [])
+    except (json.JSONDecodeError, AttributeError):
+        return JsonResponse({
+            'error': 'Body JSON inválido. Se espera: {"categories": ["Cat1", "Cat2"]}'
+        }, status=400)
 
-    if not categories_param:
+    if not categories or not isinstance(categories, list):
         return JsonResponse({
             'productos': []
         })
 
-    # Parsear categorías
-    categories = [cat.strip() for cat in categories_param.split(',') if cat.strip()]
+    # Limpiar y filtrar categorías vacías
+    categories = [cat.strip() for cat in categories if cat and isinstance(cat, str) and cat.strip()]
 
     # Consultar productos filtrados por categorías
     products = Product.objects.filter(
