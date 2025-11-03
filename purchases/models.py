@@ -81,13 +81,8 @@ class PurchaseItem(models.Model):
     quantity = models.DecimalField(max_digits=10, decimal_places=3, verbose_name='Cantidad')
     unit_type = models.CharField(max_length=50, blank=True, null=True, verbose_name='Tipo de Unidad')
 
-    # Prices in VES
-    unit_price_ves = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True, verbose_name='Precio Unitario (VES)')
+    # Prices
     total_ves = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name='Total (VES)')
-
-    # Prices in USD
-    unit_price_usd_bcv = models.DecimalField(max_digits=15, decimal_places=4, blank=True, null=True, verbose_name='Precio Unit. USD (BCV)')
-    unit_price_usd_binance = models.DecimalField(max_digits=15, decimal_places=4, blank=True, null=True, verbose_name='Precio Unit. USD (Binance)')
     total_usd_bcv = models.DecimalField(max_digits=15, decimal_places=4, blank=True, null=True, verbose_name='Total USD (BCV)')
     total_usd_binance = models.DecimalField(max_digits=15, decimal_places=4, blank=True, null=True, verbose_name='Total USD (Binance)')
 
@@ -109,6 +104,27 @@ class PurchaseItem(models.Model):
             models.Index(fields=['product'], name='idx_purch_items_product'),
             models.Index(fields=['product', 'created_at'], name='idx_purch_item_prod_date'),
         ]
+
+    @property
+    def unit_price_ves(self):
+        """Calculate unit price in VES from total and quantity"""
+        if self.quantity and self.quantity > 0:
+            return self.total_ves / self.quantity
+        return None
+
+    @property
+    def unit_price_usd_bcv(self):
+        """Calculate unit price in USD (BCV rate) from total and quantity"""
+        if self.quantity and self.quantity > 0 and self.total_usd_bcv:
+            return self.total_usd_bcv / self.quantity
+        return None
+
+    @property
+    def unit_price_usd_binance(self):
+        """Calculate unit price in USD (Binance rate) from total and quantity"""
+        if self.quantity and self.quantity > 0 and self.total_usd_binance:
+            return self.total_usd_binance / self.quantity
+        return None
 
     def __str__(self):
         return f"{self.description} - {self.quantity} {self.unit_type or ''}"
