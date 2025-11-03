@@ -25,7 +25,6 @@ class Product(models.Model):
     normalized_name = models.CharField(max_length=255, verbose_name='Nombre Normalizado')
     category = models.ForeignKey(ProductCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='products', verbose_name='Categoría')
     brand = models.CharField(max_length=100, blank=True, null=True, verbose_name='Marca')
-    unit_type = models.CharField(max_length=50, blank=True, null=True, verbose_name='Tipo de Unidad')
     description = models.TextField(blank=True, null=True, verbose_name='Descripción')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de Creación')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Fecha de Actualización')
@@ -35,7 +34,7 @@ class Product(models.Model):
         verbose_name = 'Producto'
         verbose_name_plural = 'Productos'
         ordering = ['normalized_name', 'brand']
-        unique_together = [['normalized_name', 'brand', 'unit_type']]
+        unique_together = [['normalized_name', 'brand']]
         indexes = [
             models.Index(fields=['category'], name='idx_products_category'),
             models.Index(fields=['normalized_name'], name='idx_products_normalized_name'),
@@ -45,6 +44,4 @@ class Product(models.Model):
         parts = [self.normalized_name]
         if self.brand:
             parts.append(f"({self.brand})")
-        if self.unit_type:
-            parts.append(f"- {self.unit_type}")
         return ' '.join(parts)
