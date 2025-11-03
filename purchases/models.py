@@ -83,15 +83,13 @@ class PurchaseItem(models.Model):
 
     # Prices in VES
     unit_price_ves = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True, verbose_name='Precio Unitario (VES)')
-    discount_ves = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name='Descuento (VES)')
-    tax_ves = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name='Impuesto (VES)')
-    subtotal_ves = models.DecimalField(max_digits=15, decimal_places=2, verbose_name='Subtotal (VES)')
+    total_ves = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name='Total (VES)')
 
     # Prices in USD
     unit_price_usd_bcv = models.DecimalField(max_digits=15, decimal_places=4, blank=True, null=True, verbose_name='Precio Unit. USD (BCV)')
     unit_price_usd_binance = models.DecimalField(max_digits=15, decimal_places=4, blank=True, null=True, verbose_name='Precio Unit. USD (Binance)')
-    subtotal_usd_bcv = models.DecimalField(max_digits=15, decimal_places=4, blank=True, null=True, verbose_name='Subtotal USD (BCV)')
-    subtotal_usd_binance = models.DecimalField(max_digits=15, decimal_places=4, blank=True, null=True, verbose_name='Subtotal USD (Binance)')
+    total_usd_bcv = models.DecimalField(max_digits=15, decimal_places=4, blank=True, null=True, verbose_name='Total USD (BCV)')
+    total_usd_binance = models.DecimalField(max_digits=15, decimal_places=4, blank=True, null=True, verbose_name='Total USD (Binance)')
 
     # Normalized price per standard unit
     price_per_unit_ves = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True, verbose_name='Precio/Unidad Std (VES)')

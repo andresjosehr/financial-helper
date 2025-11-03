@@ -19,7 +19,7 @@ class PurchaseAdmin(admin.ModelAdmin):
 
 @admin.register(PurchaseItem)
 class PurchaseItemAdmin(admin.ModelAdmin):
-    list_display = ['description', 'purchase', 'product', 'quantity', 'unit_type', 'subtotal_ves']
+    list_display = ['description', 'purchase', 'product', 'quantity', 'unit_type', 'total_ves']
     list_filter = ['unit_type', 'product']
     search_fields = ['description', 'product_code', 'purchase__user__username']
     readonly_fields = ['id', 'created_at']
