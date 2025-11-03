@@ -449,13 +449,17 @@ def calculate_otsu_threshold(image_array):
 def process_with_params(request):
     """
     Endpoint para procesar imágenes con parámetros personalizables
+
+    Parámetros de formato de respuesta:
+    - response_format=binary (por defecto): Devuelve la imagen como binario PNG
+    - response_format=base64: Devuelve JSON con la imagen en base64
     """
     try:
         if 'image' not in request.FILES:
             return JsonResponse({'error': 'No se proporcionó una imagen'}, status=400)
 
         image_file = request.FILES['image']
-        
+
         # Obtener parámetros (con valores por defecto)
         params = {
             'median_blur': int(request.POST.get('median_blur', 1)),
@@ -472,6 +476,9 @@ def process_with_params(request):
             'skip_crop': request.POST.get('skip_crop', 'false') == 'true'
         }
 
+        # Formato de respuesta: binary (por defecto) o base64
+        response_format = request.POST.get('response_format', 'binary').lower()
+
         # Abrir imagen
         image = Image.open(image_file)
         if image.mode != 'RGB':
@@ -480,17 +487,29 @@ def process_with_params(request):
         # Procesar con parámetros personalizados
         result = process_with_custom_params(image, params)
 
-        # Retornar como base64
+        # Preparar buffer con la imagen procesada
         buffer = io.BytesIO()
         result.save(buffer, format='PNG')
         buffer.seek(0)
-        img_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
 
-        return JsonResponse({
-            'success': True,
-            'image': f'data:image/png;base64,{img_base64}',
-            'params': params
-        })
+        # Retornar según el formato solicitado
+        if response_format == 'base64':
+            # Respuesta JSON con base64
+            img_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            return JsonResponse({
+                'success': True,
+                'image': f'data:image/png;base64,{img_base64}',
+                'original_size': f'{image.width}x{image.height}',
+                'processed_size': f'{result.width}x{result.height}',
+                'params': params
+            })
+        else:
+            # Respuesta binaria (por defecto)
+            response = HttpResponse(buffer.getvalue(), content_type='image/png')
+            response['Content-Disposition'] = 'inline; filename="processed_invoice.png"'
+            response['Content-Type'] = 'image/png'
+            response['X-Content-Type-Options'] = 'nosniff'
+            return response
 
     except Exception as e:
         import traceback
@@ -585,27 +604,69 @@ def tuning_page(request):
 def process_invoice_optimal(request):
     """
     Endpoint optimizado para procesar facturas con la mejor configuración encontrada
+
+    Parámetros opcionales:
+    - response_format=binary (por defecto): Devuelve la imagen como binario PNG
+    - response_format=base64: Devuelve JSON con la imagen en base64
+    - skip_crop=true/false: Omitir el recorte automático (por defecto: false)
     """
-    # Usar los parámetros óptimos directamente
-    optimal_params = {
-        'median_blur': 1,
-        'bilateral_d': 14,
-        'bilateral_sigma': 100,
-        'clahe_clip': 0,
-        'clahe_grid': 4,
-        'adaptive_block': 17,
-        'adaptive_c': 2,
-        'gaussian_blur': 6,
-        'morph_open': 0,
-        'morph_close': 0,
-        'sharpness': 0,
-        'skip_crop': False
-    }
-    
-    # Reutilizar el código de process_with_params
-    request.POST = request.POST.copy()
-    for key, value in optimal_params.items():
-        if key not in request.POST:
-            request.POST[key] = str(value)
-    
-    return process_with_params(request)
+    try:
+        if 'image' not in request.FILES:
+            return JsonResponse({'error': 'No se proporcionó una imagen'}, status=400)
+
+        image_file = request.FILES['image']
+
+        # Parámetros óptimos predefinidos
+        optimal_params = {
+            'median_blur': 1,
+            'bilateral_d': 14,
+            'bilateral_sigma': 100,
+            'clahe_clip': 0,
+            'clahe_grid': 4,
+            'adaptive_block': 17,
+            'adaptive_c': 2,
+            'gaussian_blur': 6,
+            'morph_open': 0,
+            'morph_close': 0,
+            'sharpness': 0,
+            'skip_crop': request.POST.get('skip_crop', 'false').lower() == 'true'
+        }
+
+        # Formato de respuesta: binary (por defecto) o base64
+        response_format = request.POST.get('response_format', 'binary').lower()
+
+        # Abrir imagen
+        image = Image.open(image_file)
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+
+        # Procesar con parámetros óptimos
+        result = process_with_custom_params(image, optimal_params)
+
+        # Preparar buffer con la imagen procesada
+        buffer = io.BytesIO()
+        result.save(buffer, format='PNG')
+        buffer.seek(0)
+
+        # Retornar según el formato solicitado
+        if response_format == 'base64':
+            # Respuesta JSON con base64
+            img_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            return JsonResponse({
+                'success': True,
+                'image': f'data:image/png;base64,{img_base64}',
+                'original_size': f'{image.width}x{image.height}',
+                'processed_size': f'{result.width}x{result.height}'
+            })
+        else:
+            # Respuesta binaria (por defecto)
+            response = HttpResponse(buffer.getvalue(), content_type='image/png')
+            response['Content-Disposition'] = 'inline; filename="processed_invoice.png"'
+            response['Content-Type'] = 'image/png'
+            response['X-Content-Type-Options'] = 'nosniff'
+            return response
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'error': str(e)}, status=500)

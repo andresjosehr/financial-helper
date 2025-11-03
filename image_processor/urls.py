@@ -5,5 +5,7 @@ urlpatterns = [
     path('test/', views.test_page, name='image_processor_test'),
     path('tuning/', views.tuning_page, name='image_processor_tuning'),
     path('process-invoice/', views.process_invoice_optimal, name='process_invoice'),
+    path('process-invoice.png', views.process_invoice_optimal, name='process_invoice_png'),
     path('process-with-params/', views.process_with_params, name='process_with_params'),
+    path('process-with-params.png', views.process_with_params, name='process_with_params_png'),
 ]

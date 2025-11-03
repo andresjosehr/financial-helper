@@ -588,6 +588,7 @@
                 formData.append(id, document.getElementById(id).value);
             });
             formData.append('skip_crop', document.getElementById('skip_crop').checked);
+            formData.append('response_format', 'base64');
 
             try {
                 const response = await fetch('/api/process-with-params/', {
