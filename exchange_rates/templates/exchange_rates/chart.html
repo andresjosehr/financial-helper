@@ -211,23 +211,6 @@
                 </div>
             </div>
 
-            <!-- Gráfico 3: Spread Absoluto en Bs -->
-            <div class="bg-white rounded-lg shadow-md p-4 mb-3">
-                <h3 class="text-sm font-semibold text-green-700 mb-2">💰 Spread en Bolívares - Ganancia Real</h3>
-
-                <div x-show="loading" class="flex justify-center items-center" style="height: 300px;">
-                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
-                </div>
-
-                <div x-show="!loading && !error">
-                    <div
-                        id="spreadBsChart"
-                        class="w-full"
-                        style="height: 300px;"
-                    ></div>
-                </div>
-            </div>
-
             <!-- Footer info -->
             <div class="mt-3 text-center text-xs text-gray-500">
                 <span x-text="startDate" class="font-semibold"></span> → <span x-text="endDate" class="font-semibold"></span>
@@ -251,8 +234,6 @@
                 spreadSeries: null,
                 spreadChart: null,
                 spreadChartSeries: null,
-                spreadBsChart: null,
-                spreadBsChartSeries: null,
                 stats: {
                     bcv: null,
                     binance: null,
@@ -675,7 +656,6 @@
 
                     // Renderizar gráficos adicionales
                     this.renderSpreadPercentChart(bcvFilled, binanceRates);
-                    this.renderSpreadBsChart(bcvFilled, binanceRates);
                 },
 
                 renderSpreadPercentChart(bcvFilled, binanceRates) {
@@ -758,7 +738,7 @@
                             autoScale: true,
                             scaleMargins: {
                                 top: 0.1,
-                                bottom: 0.1,
+                                bottom: 0.2,
                             },
                         },
                         timeScale: {
@@ -814,6 +794,16 @@
                         p75Line.setData(spreadDataFiltered.map(d => ({ time: d.time, value: this.stats.spreadStats.p75 })));
                     }
 
+                    // Línea invisible en 20% para forzar el eje Y a empezar desde 20%
+                    const anchorLine = this.spreadChart.addLineSeries({
+                        color: 'transparent',
+                        lineWidth: 0,
+                        priceLineVisible: false,
+                        lastValueVisible: false,
+                        crosshairMarkerVisible: false,
+                    });
+                    anchorLine.setData(spreadDataFiltered.map(d => ({ time: d.time, value: 20 })));
+
                     // Configurar vista inicial
                     setTimeout(() => {
                         if (!this.spreadChart) return;
@@ -830,6 +820,7 @@
                                 to: totalBars
                             });
                         }
+
                     }, 100);
 
                     // Hacer responsive
@@ -839,145 +830,6 @@
                         this.spreadChart.applyOptions({ width: newWidth });
                     }).observe(container);
                 },
-
-                renderSpreadBsChart(bcvFilled, binanceRates) {
-                    const container = document.getElementById('spreadBsChart');
-                    if (!container || typeof LightweightCharts === 'undefined') return;
-
-                    // Remover chart anterior si existe
-                    if (this.spreadBsChart) {
-                        this.spreadBsChart.remove();
-                        this.spreadBsChart = null;
-                    }
-
-                    if (bcvFilled.length === 0 || binanceRates.length === 0) return;
-
-                    // Crear mapa de BCV
-                    const bcvMap = new Map();
-                    bcvFilled.forEach(r => {
-                        const rate = parseFloat(r.rate);
-                        if (!isNaN(rate) && isFinite(rate)) {
-                            bcvMap.set(r.timestamp, rate);
-                        }
-                    });
-
-                    // Calcular spread en Bs
-                    const spreadBsData = [];
-                    binanceRates.forEach(r => {
-                        const timestamp = r.timestamp;
-                        const binanceRate = parseFloat(r.rate);
-                        const bcvRate = bcvMap.get(timestamp);
-
-                        if (bcvRate && !isNaN(binanceRate) && isFinite(binanceRate) && bcvRate > 0) {
-                            const spreadBs = binanceRate - bcvRate;
-                            const unixTime = Math.floor(new Date(timestamp).getTime() / 1000);
-
-                            if (!isNaN(spreadBs) && isFinite(spreadBs) && !isNaN(unixTime)) {
-                                spreadBsData.push({
-                                    time: unixTime,
-                                    value: spreadBs,
-                                    color: spreadBs >= 0 ? '#10b981' : '#ef4444'
-                                });
-                            }
-                        }
-                    });
-
-                    const spreadBsDataFiltered = spreadBsData
-                        .filter(d => d.time && !isNaN(d.time) && d.value !== undefined && !isNaN(d.value) && isFinite(d.value))
-                        .sort((a, b) => a.time - b.time);
-
-                    if (spreadBsDataFiltered.length === 0) return;
-
-                    // Crear chart
-                    this.spreadBsChart = LightweightCharts.createChart(container, {
-                        width: container.clientWidth,
-                        height: 300,
-                        layout: {
-                            background: { color: '#ffffff' },
-                            textColor: '#333',
-                        },
-                        grid: {
-                            vertLines: { color: '#f0f0f0' },
-                            horzLines: { color: '#f0f0f0' },
-                        },
-                        crosshair: {
-                            mode: LightweightCharts.CrosshairMode.Normal,
-                        },
-                        rightPriceScale: {
-                            borderColor: '#cccccc',
-                            autoScale: true,
-                            scaleMargins: {
-                                top: 0.1,
-                                bottom: 0.1,
-                            },
-                        },
-                        timeScale: {
-                            borderColor: '#cccccc',
-                            timeVisible: true,
-                            secondsVisible: false,
-                        },
-                        handleScroll: {
-                            mouseWheel: true,
-                            pressedMouseMove: true,
-                        },
-                        handleScale: {
-                            axisPressedMouseMove: true,
-                            mouseWheel: true,
-                            pinch: true,
-                        },
-                    });
-
-                    // Añadir serie de histograma
-                    this.spreadBsChartSeries = this.spreadBsChart.addHistogramSeries({
-                        color: '#10b981',
-                        priceFormat: {
-                            type: 'price',
-                            precision: 4,
-                            minMove: 0.0001,
-                        },
-                    });
-
-                    this.spreadBsChartSeries.setData(spreadBsDataFiltered);
-
-                    // Añadir línea de referencia del promedio
-                    if (this.stats.spreadStats) {
-                        const avgBsLine = this.spreadBsChart.addLineSeries({
-                            color: '#f59e0b',
-                            lineWidth: 2,
-                            lineStyle: LightweightCharts.LineStyle.Dashed,
-                            title: 'Promedio',
-                            priceLineVisible: false,
-                            lastValueVisible: true,
-                        });
-                        avgBsLine.setData(spreadBsDataFiltered.map(d => ({ time: d.time, value: this.stats.spreadStats.avgBs })));
-                    }
-
-                    // Configurar vista inicial
-                    setTimeout(() => {
-                        if (!this.spreadBsChart) return;
-                        const timeScale = this.spreadBsChart.timeScale();
-                        const logicalRange = timeScale.getVisibleLogicalRange();
-
-                        if (logicalRange) {
-                            const totalBars = logicalRange.to;
-                            const sevenDaysApprox = 7 * 24 * 4;
-                            const barsToShow = Math.min(sevenDaysApprox, totalBars);
-
-                            timeScale.setVisibleLogicalRange({
-                                from: totalBars - barsToShow,
-                                to: totalBars
-                            });
-                        }
-                    }, 100);
-
-                    // Hacer responsive
-                    new ResizeObserver(entries => {
-                        if (entries.length === 0 || !this.spreadBsChart) return;
-                        const newWidth = entries[0].contentRect.width;
-                        this.spreadBsChart.applyOptions({ width: newWidth });
-                    }).observe(container);
-                },
-
 
                 formatDate(dateStr) {
                     const date = new Date(dateStr + 'T00:00:00');
