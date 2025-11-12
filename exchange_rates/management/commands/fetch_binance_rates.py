@@ -1,233 +1,215 @@
 """
-Comando para importar tasas históricas de Binance P2P desde el API externo
+Comando para actualizar tasas de Binance P2P en tiempo real
+
+Estrategia de consulta:
+1. Primera consulta SIN transAmount para obtener la mejor tasa actual
+2. Calcular equivalente de 100 USD en VES con esa tasa
+3. Segunda consulta CON transAmount en VES para filtrar ofertas de ~100 USD
+4. Guardar el promedio simple de los precios
 
 Uso:
-    docker compose exec web python manage.py fetch_binance_rates
-    docker compose exec web python manage.py fetch_binance_rates --date 2025-11-02
-    docker compose exec web python manage.py fetch_binance_rates --start-date 2025-10-03 --end-date 2025-11-02
+    docker compose exec web python manage.py update_binance_rates
 """
 
 import requests
 from decimal import Decimal
-from datetime import datetime, date, timedelta
 from django.core.management.base import BaseCommand
+from django.utils import timezone
 from exchange_rates.models import ExchangeRate
 
 
 class Command(BaseCommand):
-    help = 'Importa tasas históricas de Binance P2P desde el API externo'
+    help = 'Actualiza tasas de Binance P2P consultando el API directamente'
 
-    def add_arguments(self, parser):
-        parser.add_argument(
-            '--date',
-            type=str,
-            help='Fecha específica (YYYY-MM-DD)'
-        )
-
-        parser.add_argument(
-            '--start-date',
-            type=str,
-            help='Fecha inicial para rango (YYYY-MM-DD)'
-        )
-
-        parser.add_argument(
-            '--end-date',
-            type=str,
-            help='Fecha final para rango (YYYY-MM-DD)'
-        )
-
-        parser.add_argument(
-            '--api-url',
-            type=str,
-            default='https://finance.andresjosehr.com/api/binance-p2p/exchange-rates',
-            help='URL del API'
-        )
+    # Configuración fija
+    ASSET = 'USDT'
+    FIAT = 'VES'
+    TARGET_USD = 100  # Queremos ofertas para ~100 USD
+    ROWS = 20  # Número de ofertas a promediar
 
     def handle(self, *args, **options):
-        api_url = options['api_url']
+        self.stdout.write('🔍 Consultando Binance P2P API...')
 
-        # Determinar fechas a procesar
-        dates_to_process = []
+        # Timestamp actual
+        now = timezone.now()
 
-        if options['date']:
-            # Una sola fecha
-            try:
-                single_date = datetime.strptime(options['date'], '%Y-%m-%d').date()
-                dates_to_process.append(single_date)
-            except ValueError:
+        try:
+            # PASO 1: Consulta SIN transAmount para obtener la mejor tasa actual
+            self.stdout.write('  📍 Paso 1: Obteniendo tasa de referencia...')
+
+            buy_reference = self._fetch_binance_p2p(trade_type='BUY', trans_amount=None)
+            sell_reference = self._fetch_binance_p2p(trade_type='SELL', trans_amount=None)
+
+            if not buy_reference or not sell_reference:
                 self.stdout.write(
-                    self.style.ERROR(f'❌ Fecha inválida: {options["date"]}')
+                    self.style.ERROR('❌ Error: No se pudo obtener tasa de referencia')
                 )
                 return
 
-        elif options['start_date'] and options['end_date']:
-            # Rango de fechas
-            try:
-                start = datetime.strptime(options['start_date'], '%Y-%m-%d').date()
-                end = datetime.strptime(options['end_date'], '%Y-%m-%d').date()
+            # Obtener el precio de la primera oferta (mejor precio)
+            best_buy_price = float(buy_reference['data'][0]['adv']['price'])
+            best_sell_price = float(sell_reference['data'][0]['adv']['price'])
 
-                if start > end:
-                    self.stdout.write(
-                        self.style.ERROR('❌ La fecha inicial debe ser menor o igual a la final')
-                    )
-                    return
+            # PASO 2: Calcular equivalente de 100 USD en VES
+            trans_amount_buy = int(self.TARGET_USD * best_buy_price)
+            trans_amount_sell = int(self.TARGET_USD * best_sell_price)
 
-                current = start
-                while current <= end:
-                    dates_to_process.append(current)
-                    current += timedelta(days=1)
+            self.stdout.write(f'  📊 Mejor tasa BUY: {best_buy_price:.4f} VES/USDT')
+            self.stdout.write(f'  📊 Mejor tasa SELL: {best_sell_price:.4f} VES/USDT')
+            self.stdout.write(f'  💰 {self.TARGET_USD} USD = {trans_amount_buy:,.0f} Bs (BUY) / {trans_amount_sell:,.0f} Bs (SELL)')
 
-            except ValueError as e:
+            # PASO 3: Consulta CON transAmount en VES para filtrar ofertas de ~100 USD
+            self.stdout.write(f'  📍 Paso 2: Obteniendo ofertas para ~{self.TARGET_USD} USD...')
+
+            buy_data = self._fetch_binance_p2p(trade_type='BUY', trans_amount=trans_amount_buy)
+            sell_data = self._fetch_binance_p2p(trade_type='SELL', trans_amount=trans_amount_sell)
+
+            if not buy_data or not sell_data:
                 self.stdout.write(
-                    self.style.ERROR(f'❌ Error en fechas: {e}')
+                    self.style.ERROR('❌ Error: No se pudieron obtener datos de Binance')
                 )
                 return
-        else:
-            # Por defecto: rango desde 2025-10-03 hasta 2025-11-02
-            start = date(2025, 10, 3)
-            end = date(2025, 11, 2)
 
-            current = start
-            while current <= end:
-                dates_to_process.append(current)
-                current += timedelta(days=1)
+            # PASO 4: Calcular promedios simples
+            buy_prices = [float(ad['adv']['price']) for ad in buy_data.get('data', [])]
+            sell_prices = [float(ad['adv']['price']) for ad in sell_data.get('data', [])]
 
-        self.stdout.write(
-            self.style.MIGRATE_HEADING(f'Procesando {len(dates_to_process)} fechas...')
-        )
-        self.stdout.write('')
-
-        total_created = 0
-        total_updated = 0
-        total_errors = 0
-
-        for target_date in dates_to_process:
-            date_str = target_date.strftime('%Y-%m-%d')
-
-            # Consultar API
-            try:
-                response = requests.get(
-                    api_url,
-                    params={'date': date_str, 'per_page': 100},
-                    timeout=30
-                )
-                response.raise_for_status()
-                data = response.json()
-
-            except requests.exceptions.RequestException as e:
+            if not buy_prices or not sell_prices:
                 self.stdout.write(
-                    self.style.ERROR(f'❌ Error al consultar {date_str}: {e}')
+                    self.style.ERROR('❌ Error: No hay ofertas disponibles')
                 )
-                total_errors += 1
-                continue
+                return
 
-            # Procesar datos
-            records = data.get('data', [])
+            avg_buy = sum(buy_prices) / len(buy_prices)
+            avg_sell = sum(sell_prices) / len(sell_prices)
 
-            if not records:
+            self.stdout.write(f'  📊 Ofertas BUY: {len(buy_prices)} - Rango: {min(buy_prices):.4f} - {max(buy_prices):.4f}')
+            self.stdout.write(f'  📊 Ofertas SELL: {len(sell_prices)} - Rango: {min(sell_prices):.4f} - {max(sell_prices):.4f}')
+
+            # Guardar en la base de datos
+            buy_rate, buy_created = ExchangeRate.objects.update_or_create(
+                source=ExchangeRate.SOURCE_BINANCE_BUY,
+                timestamp=now,
+                defaults={
+                    'date': now.date(),
+                    'rate': Decimal(str(avg_buy)).quantize(Decimal('0.0001')),
+                    'notes': f'Promedio simple de {len(buy_prices)} ofertas P2P'
+                }
+            )
+
+            sell_rate, sell_created = ExchangeRate.objects.update_or_create(
+                source=ExchangeRate.SOURCE_BINANCE_SELL,
+                timestamp=now,
+                defaults={
+                    'date': now.date(),
+                    'rate': Decimal(str(avg_sell)).quantize(Decimal('0.0001')),
+                    'notes': f'Promedio simple de {len(sell_prices)} ofertas P2P'
+                }
+            )
+
+            # Mostrar resultados
+            self.stdout.write('')
+            self.stdout.write(self.style.SUCCESS('=' * 70))
+            self.stdout.write(
+                self.style.SUCCESS(f'✓ BINANCE_BUY: {avg_buy:,.4f} Bs/USD {"(creado)" if buy_created else "(actualizado)"}')
+            )
+            self.stdout.write(
+                self.style.SUCCESS(f'✓ BINANCE_SELL: {avg_sell:,.4f} Bs/USD {"(creado)" if sell_created else "(actualizado)"}')
+            )
+            self.stdout.write(
+                self.style.SUCCESS(f'✓ Spread: {abs(avg_sell - avg_buy):,.4f} Bs/USD')
+            )
+            self.stdout.write(self.style.SUCCESS('=' * 70))
+            self.stdout.write('')
+
+        except Exception as e:
+            self.stdout.write(
+                self.style.ERROR(f'❌ Error inesperado: {e}')
+            )
+            raise
+
+    def _fetch_binance_p2p(self, trade_type, trans_amount=None):
+        """
+        Consulta el API de Binance P2P
+
+        Args:
+            trade_type: Tipo de operación (BUY o SELL)
+            trans_amount: Monto en VES para filtrar ofertas (None = sin filtro)
+
+        Returns:
+            dict con la respuesta del API o None si falla
+        """
+        url = 'https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search'
+
+        headers = {
+            'accept': '*/*',
+            'accept-language': 'es-ES,es;q=0.9,en;q=0.8',
+            'bnc-level': '0',
+            'bnc-location': 'VE',
+            'bnc-time-zone': 'America/Caracas',
+            'c2ctype': 'c2c_web',
+            'cache-control': 'no-cache',
+            'clienttype': 'web',
+            'content-type': 'application/json',
+            'lang': 'es',
+            'origin': 'https://p2p.binance.com',
+            'pragma': 'no-cache',
+            'referer': 'https://p2p.binance.com/es',
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36',
+        }
+
+        payload = {
+            'fiat': self.FIAT,
+            'page': 1,
+            'rows': self.ROWS,
+            'tradeType': trade_type,
+            'asset': self.ASSET,
+            'countries': [],
+            'proMerchantAds': False,
+            'shieldMerchantAds': False,
+            'filterType': 'all',
+            'periods': [],
+            'additionalKycVerifyFilter': 0,
+            'publisherType': 'merchant',
+            'payTypes': [],
+            'classifies': ['mass', 'profession', 'fiat_trade'],
+            'tradedWith': False,
+            'followed': False,
+        }
+
+        # Solo agregar transAmount si se especifica (en VES)
+        if trans_amount is not None:
+            payload['transAmount'] = trans_amount
+
+        try:
+            response = requests.post(
+                url,
+                json=payload,
+                headers=headers,
+                timeout=30
+            )
+            response.raise_for_status()
+
+            data = response.json()
+
+            # Validar respuesta
+            if data.get('code') != '000000':
                 self.stdout.write(
-                    self.style.WARNING(f'⚠ Sin datos para {date_str}')
+                    self.style.ERROR(f'❌ Error del API Binance: {data.get("message", "Unknown error")}')
                 )
-                continue
+                return None
 
-            # Guardar cada snapshot individual con timestamp
-            created_count = 0
-            updated_count = 0
-
-            for record in records:
-                record_type = record.get('type')
-                avg_price = record.get('avg_price')
-                timestamp_str = record.get('timestamp')
-
-                if not avg_price or not timestamp_str or not record_type:
-                    continue
-
-                # Parsear timestamp
-                from django.utils import timezone
-
-                try:
-                    # El timestamp viene como "2025-11-02T00:00:06.000000Z"
-                    timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
-                except (ValueError, AttributeError):
-                    continue
-
-                # Determinar source
-                if record_type == 'buy':
-                    source = ExchangeRate.SOURCE_BINANCE_BUY
-                elif record_type == 'sell':
-                    source = ExchangeRate.SOURCE_BINANCE_SELL
-                else:
-                    continue
-
-                # Crear/actualizar snapshot
-                rate_obj, created = ExchangeRate.objects.update_or_create(
-                    source=source,
-                    timestamp=timestamp,
-                    defaults={
-                        'date': target_date,
-                        'rate': Decimal(str(avg_price)).quantize(Decimal('0.0001')),
-                        'notes': f'Snapshot horario de Binance P2P'
-                    }
+            # Validar que haya datos
+            if not data.get('data'):
+                self.stdout.write(
+                    self.style.WARNING(f'⚠️  No hay ofertas disponibles para {trade_type}')
                 )
+                return None
 
-                if created:
-                    created_count += 1
-                else:
-                    updated_count += 1
+            return data
 
-            total_created += created_count
-            total_updated += updated_count
-
-            # Mostrar progreso
-            status = '✓' if (created_count > 0 or updated_count > 0) else '⚠'
+        except requests.exceptions.RequestException as e:
             self.stdout.write(
-                f'{status} {date_str}: '
-                f'{len(records)} snapshots totales '
-                f'- Creadas: {created_count}, Actualizadas: {updated_count}'
+                self.style.ERROR(f'❌ Error de conexión: {e}')
             )
-
-        # Resumen final
-        self.stdout.write('')
-        self.stdout.write(self.style.SUCCESS('=' * 70))
-        self.stdout.write(self.style.SUCCESS(f'✓ Tasas creadas: {total_created}'))
-        self.stdout.write(self.style.SUCCESS(f'✓ Tasas actualizadas: {total_updated}'))
-
-        if total_errors > 0:
-            self.stdout.write(
-                self.style.ERROR(f'❌ Errores: {total_errors}')
-            )
-
-        # Estadísticas finales
-        buy_count = ExchangeRate.objects.filter(
-            source=ExchangeRate.SOURCE_BINANCE_BUY
-        ).count()
-
-        sell_count = ExchangeRate.objects.filter(
-            source=ExchangeRate.SOURCE_BINANCE_SELL
-        ).count()
-
-        self.stdout.write('')
-        self.stdout.write(f'Total tasas BINANCE_BUY en BD: {buy_count}')
-        self.stdout.write(f'Total tasas BINANCE_SELL en BD: {sell_count}')
-
-        latest_buy = ExchangeRate.objects.filter(
-            source=ExchangeRate.SOURCE_BINANCE_BUY
-        ).order_by('-date').first()
-
-        latest_sell = ExchangeRate.objects.filter(
-            source=ExchangeRate.SOURCE_BINANCE_SELL
-        ).order_by('-date').first()
-
-        if latest_buy:
-            self.stdout.write(
-                f'Última tasa BUY: {latest_buy.date} = {latest_buy.rate:,.4f} Bs/USD'
-            )
-
-        if latest_sell:
-            self.stdout.write(
-                f'Última tasa SELL: {latest_sell.date} = {latest_sell.rate:,.4f} Bs/USD'
-            )
-
-        self.stdout.write(self.style.SUCCESS('=' * 70))
-        self.stdout.write('')
-        self.stdout.write(self.style.SUCCESS('✓ Importación completada'))
+            return None
