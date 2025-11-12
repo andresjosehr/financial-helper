@@ -21,4 +21,6 @@ urlpatterns = [
     path('image-processor/', include('image_processor.urls')),
     path('api/', include('image_processor.urls')),
     path('api/products/by-categories/', get_products_by_categories, name='products-by-categories'),
+    path('exchange-rates/', include('exchange_rates.urls')),
+    path('api/exchange-rates/', include('exchange_rates.urls')),
 ]

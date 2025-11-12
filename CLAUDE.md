@@ -50,6 +50,15 @@ docker-compose exec web python manage.py test
 docker-compose exec web python manage.py test establishments
 docker-compose exec web python manage.py test products
 docker-compose exec web python manage.py test purchases
+
+# Update Binance P2P exchange rates (real-time, ~100 USD equivalent)
+docker-compose exec web python manage.py update_binance_rates
+
+# Import historical Binance rates from API
+docker-compose exec web python manage.py import_binance_rates --date 2025-11-02
+
+# Import BCV rates
+docker-compose exec web python manage.py import_bcv_rates
 ```
 
 ### Database Access
@@ -81,7 +90,7 @@ docker-compose ps
 
 ## Architecture
 
-### Three Main Django Apps
+### Four Main Django Apps
 
 1. **establishments/** - Commercial establishments/stores
    - Single model: `Establishment` with legal info, location, contact details
@@ -96,6 +105,17 @@ docker-compose ps
    - `Purchase`: Complete transaction with document metadata, VES/USD totals, payment info
    - `PurchaseItem`: Individual line items with price tracking
    - Stores exchange rate snapshots (BCV/Binance) for historical analysis
+
+4. **exchange_rates/** - Exchange rate tracking (VES/USD)
+   - `ExchangeRate`: Historical snapshots from multiple sources (BCV, Binance P2P)
+   - Real-time updates via `update_binance_rates` command:
+     - Two-query strategy: reference query + filtered query with transAmount in VES
+     - Filters offers for ~100 USD equivalent in bolivares
+     - Calculates simple average of 20 BUY and 20 SELL offers
+     - Consults Binance P2P API directly (no intermediaries)
+   - Historical data import via `import_binance_rates` and `import_bcv_rates` commands
+   - Each rate includes: source, rate (Bs/USD), date, timestamp, and notes
+   - See `BINANCE_AUTO_UPDATE.md` for automated collection setup (every 15 minutes)
 
 ### Key Design Patterns
 

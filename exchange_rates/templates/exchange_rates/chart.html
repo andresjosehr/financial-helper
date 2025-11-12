@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tasas de Cambio - Gráfico</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- TradingView Lightweight Charts (cargar primero, sin defer) -->
+    <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+
+    <!-- Alpine.js CDN (defer para cargar después) -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen py-8 px-4" x-data="chartApp()">
+        <div class="max-w-7xl mx-auto">
+
+            <!-- Header -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h1 class="text-3xl font-bold text-gray-800 mb-2">
+                    Tasas de Cambio VES/USD
+                </h1>
+                <p class="text-gray-600">
+                    BCV (oficial) y Binance P2P (venta) - Visualización histórica
+                </p>
+            </div>
+
+            <!-- Controls -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                    <!-- Selector de días -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Período
+                        </label>
+                        <select
+                            x-model="days"
+                            @change="fetchData()"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                            <option value="7">Última semana (7 días)</option>
+                            <option value="14">Últimas 2 semanas</option>
+                            <option value="30">Último mes (30 días)</option>
+                            <option value="60">Últimos 2 meses</option>
+                            <option value="90">Últimos 3 meses</option>
+                            <option value="180">Últimos 6 meses</option>
+                            <option value="365">Último año</option>
+                        </select>
+                    </div>
+
+                    <!-- Fecha final -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Fecha final
+                        </label>
+                        <input
+                            type="date"
+                            x-model="endDate"
+                            @change="fetchData()"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                    </div>
+
+                    <!-- Botón actualizar -->
+                    <div class="flex items-end">
+                        <button
+                            @click="fetchData()"
+                            :disabled="loading"
+                            class="w-full px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                        >
+                            <span x-show="!loading">Actualizar</span>
+                            <span x-show="loading">Cargando...</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Cards - BCV -->
+            <div x-show="stats.bcv">
+                <h2 class="text-lg font-semibold text-gray-700 mb-3">📊 BCV (Oficial)</h2>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-white rounded-lg shadow-md p-4">
+                        <div class="text-sm text-gray-600 mb-1">Actual</div>
+                        <div class="text-2xl font-bold text-blue-600" x-text="formatRate(stats.bcv?.current)"></div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-md p-4">
+                        <div class="text-sm text-gray-600 mb-1">Máxima</div>
+                        <div class="text-2xl font-bold text-red-600" x-text="formatRate(stats.bcv?.max)"></div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-md p-4">
+                        <div class="text-sm text-gray-600 mb-1">Mínima</div>
+                        <div class="text-2xl font-bold text-green-600" x-text="formatRate(stats.bcv?.min)"></div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-md p-4">
+                        <div class="text-sm text-gray-600 mb-1">Variación</div>
+                        <div
+                            class="text-2xl font-bold"
+                            :class="stats.bcv?.change >= 0 ? 'text-red-600' : 'text-green-600'"
+                            x-text="formatChange(stats.bcv?.change)"
+                        ></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Cards - Binance -->
+            <div x-show="stats.binance">
+                <h2 class="text-lg font-semibold text-gray-700 mb-3">💱 Binance P2P (Venta)</h2>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-white rounded-lg shadow-md p-4">
+                        <div class="text-sm text-gray-600 mb-1">Actual</div>
+                        <div class="text-2xl font-bold text-orange-600" x-text="formatRate(stats.binance?.current)"></div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-md p-4">
+                        <div class="text-sm text-gray-600 mb-1">Máxima</div>
+                        <div class="text-2xl font-bold text-red-600" x-text="formatRate(stats.binance?.max)"></div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-md p-4">
+                        <div class="text-sm text-gray-600 mb-1">Mínima</div>
+                        <div class="text-2xl font-bold text-green-600" x-text="formatRate(stats.binance?.min)"></div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-md p-4">
+                        <div class="text-sm text-gray-600 mb-1">Variación</div>
+                        <div
+                            class="text-2xl font-bold"
+                            :class="stats.binance?.change >= 0 ? 'text-red-600' : 'text-green-600'"
+                            x-text="formatChange(stats.binance?.change)"
+                        ></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Spread Info -->
+            <div x-show="stats.spread !== null" class="bg-gradient-to-r from-blue-50 to-orange-50 rounded-lg shadow-md p-4 mb-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <div class="text-sm text-gray-600 mb-1">Diferencia Binance - BCV</div>
+                        <div class="text-3xl font-bold text-purple-600" x-text="formatRate(stats.spread)"></div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-sm text-gray-600 mb-1">Porcentaje</div>
+                        <div class="text-3xl font-bold text-purple-600" x-text="formatPercentage(stats.spreadPercent)"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart Controls Info -->
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <div class="flex items-start">
+                    <svg class="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div class="text-sm text-blue-800 space-y-1">
+                        <div>
+                            <span class="font-semibold">Controles:</span>
+                            <span class="ml-2">🖱️ Rueda del mouse para zoom</span>
+                            <span class="mx-2">|</span>
+                            <span>👆 Arrastra para desplazar</span>
+                            <span class="mx-2">|</span>
+                            <span>📍 Doble clic para reset</span>
+                        </div>
+                        <div>
+                            <span class="font-semibold">Escalas:</span>
+                            <span class="ml-2">Derecha = Tasas (Bs/USD)</span>
+                            <span class="mx-2">|</span>
+                            <span class="text-purple-700 font-semibold">Izquierda = Spread %</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div x-show="loading" class="flex justify-center items-center h-96">
+                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                </div>
+
+                <div x-show="!loading && error" class="flex justify-center items-center h-96">
+                    <div class="text-red-600 text-center">
+                        <svg class="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <p class="text-lg font-semibold" x-text="error"></p>
+                    </div>
+                </div>
+
+                <div x-show="!loading && !error">
+                    <!-- Gráfico -->
+                    <div
+                        id="ratesChart"
+                        class="w-full"
+                        style="height: 500px;"
+                    ></div>
+                </div>
+            </div>
+
+            <!-- Footer info -->
+            <div class="mt-6 text-center text-sm text-gray-600">
+                <p>
+                    Período: <span x-text="startDate" class="font-semibold"></span>
+                    hasta <span x-text="endDate" class="font-semibold"></span>
+                </p>
+                <p class="mt-1">
+                    BCV: <span x-text="bcvDataPoints" class="font-semibold"></span> registros |
+                    Binance: <span x-text="binanceDataPoints" class="font-semibold"></span> registros
+                </p>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        function chartApp() {
+            return {
+                days: 30,
+                endDate: new Date().toISOString().split('T')[0],
+                startDate: '',
+                loading: false,
+                error: null,
+                chart: null,
+                bcvSeries: null,
+                binanceSeries: null,
+                spreadSeries: null,
+                stats: {
+                    bcv: null,
+                    binance: null,
+                    spread: null,
+                    spreadPercent: null
+                },
+                bcvDataPoints: 0,
+                binanceDataPoints: 0,
+
+                init() {
+                    this.fetchData();
+                },
+
+                async fetchData() {
+                    this.loading = true;
+                    this.error = null;
+
+                    try {
+                        const url = `/api/exchange-rates/bcv/?days=${this.days}&end_date=${this.endDate}`;
+                        const response = await fetch(url);
+
+                        if (!response.ok) {
+                            throw new Error('Error al cargar los datos');
+                        }
+
+                        const data = await response.json();
+
+                        this.startDate = data.start_date;
+                        this.bcvDataPoints = data.bcv.length;
+                        this.binanceDataPoints = data.binance_sell.length;
+
+                        if (data.bcv.length === 0 && data.binance_sell.length === 0) {
+                            this.error = 'No hay datos disponibles para este período';
+                            this.loading = false;
+                            return;
+                        }
+
+
+                        this.calculateStats(data.bcv, data.binance_sell);
+                        this.renderChart(data.bcv, data.binance_sell);
+
+                    } catch (err) {
+                        this.error = err.message;
+                        console.error('Error:', err);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                calculateStats(bcvRates, binanceRates) {
+                    // Stats BCV
+                    if (bcvRates.length > 0) {
+                        const bcvValues = bcvRates.map(r => r.rate);
+                        this.stats.bcv = {
+                            current: bcvValues[bcvValues.length - 1],
+                            max: Math.max(...bcvValues),
+                            min: Math.min(...bcvValues),
+                            change: bcvValues[bcvValues.length - 1] - bcvValues[0]
+                        };
+                    }
+
+                    // Stats Binance
+                    if (binanceRates.length > 0) {
+                        const binanceValues = binanceRates.map(r => r.rate);
+                        this.stats.binance = {
+                            current: binanceValues[binanceValues.length - 1],
+                            max: Math.max(...binanceValues),
+                            min: Math.min(...binanceValues),
+                            change: binanceValues[binanceValues.length - 1] - binanceValues[0]
+                        };
+                    }
+
+                    // Calcular spread
+                    if (this.stats.bcv && this.stats.binance) {
+                        this.stats.spread = this.stats.binance.current - this.stats.bcv.current;
+                        this.stats.spreadPercent = (this.stats.spread / this.stats.bcv.current) * 100;
+                    }
+                },
+
+                fillBcvGaps(bcvRates, binanceRates) {
+                    if (bcvRates.length === 0) return [];
+
+                    // Si no hay datos de Binance, devolver BCV como está (con timestamps de medianoche)
+                    if (binanceRates.length === 0) {
+                        return bcvRates.map(r => ({
+                            timestamp: r.date + 'T00:00:00Z',
+                            rate: r.rate
+                        }));
+                    }
+
+                    // Crear mapa de fechas BCV (solo fecha, sin hora)
+                    const bcvMap = new Map();
+                    bcvRates.forEach(r => {
+                        const rate = parseFloat(r.rate);
+                        if (!isNaN(rate) && isFinite(rate)) {
+                            bcvMap.set(r.date, rate);
+                        }
+                    });
+
+                    // Obtener todos los timestamps únicos de Binance
+                    const binanceTimestamps = binanceRates.map(r => ({
+                        timestamp: r.timestamp,
+                        date: r.timestamp.split('T')[0]
+                    }));
+
+                    // Para cada timestamp de Binance, asignar el valor de BCV de ese día
+                    const filled = [];
+                    let lastKnownValue = null;
+
+                    binanceTimestamps.forEach(item => {
+                        const bcvValue = bcvMap.get(item.date);
+
+                        // Si hay valor para ese día, usarlo; si no, usar el último conocido
+                        if (bcvValue !== undefined) {
+                            lastKnownValue = bcvValue;
+                        }
+
+                        if (lastKnownValue !== null) {
+                            filled.push({
+                                timestamp: item.timestamp,
+                                rate: lastKnownValue
+                            });
+                        }
+                    });
+
+                    return filled;
+                },
+
+                renderChart(bcvRates, binanceRates) {
+                    const container = document.getElementById('ratesChart');
+
+                    // Verificar que la biblioteca esté disponible
+                    if (typeof LightweightCharts === 'undefined') {
+                        console.error('LightweightCharts no está disponible');
+                        this.error = 'Error al cargar la biblioteca de gráficos';
+                        return;
+                    }
+
+                    // Rellenar huecos en BCV sincronizando con timestamps de Binance
+                    const bcvFilled = this.fillBcvGaps(bcvRates, binanceRates);
+
+                    // Remover chart anterior si existe
+                    if (this.chart) {
+                        this.chart.remove();
+                        this.chart = null;
+                    }
+
+                    // Crear nuevo chart con dos escalas de precio
+                    this.chart = LightweightCharts.createChart(container, {
+                        width: container.clientWidth,
+                        height: 500,
+                        layout: {
+                            background: { color: '#ffffff' },
+                            textColor: '#333',
+                        },
+                        grid: {
+                            vertLines: { color: '#f0f0f0' },
+                            horzLines: { color: '#f0f0f0' },
+                        },
+                        crosshair: {
+                            mode: LightweightCharts.CrosshairMode.Normal,
+                        },
+                        rightPriceScale: {
+                            borderColor: '#cccccc',
+                            scaleMargins: {
+                                top: 0.1,
+                                bottom: 0.2,
+                            },
+                        },
+                        leftPriceScale: {
+                            visible: true,
+                            borderColor: '#9333ea',
+                            scaleMargins: {
+                                top: 0.6,
+                                bottom: 0.05,
+                            },
+                        },
+                        timeScale: {
+                            borderColor: '#cccccc',
+                            timeVisible: true,
+                            secondsVisible: false,
+                        },
+                        handleScroll: {
+                            mouseWheel: true,
+                            pressedMouseMove: true,
+                        },
+                        handleScale: {
+                            axisPressedMouseMove: true,
+                            mouseWheel: true,
+                            pinch: true,
+                        },
+                    });
+
+                    // Serie BCV (línea azul)
+                    if (bcvFilled.length > 0) {
+                        this.bcvSeries = this.chart.addLineSeries({
+                            color: '#2563eb',
+                            lineWidth: 2,
+                            title: 'BCV (Oficial)',
+                            priceFormat: {
+                                type: 'price',
+                                precision: 4,
+                                minMove: 0.0001,
+                            },
+                        });
+
+                        // Convertir datos a formato TradingView usando timestamps Unix
+                        const bcvData = bcvFilled
+                            .map(r => {
+                                const timestamp = new Date(r.timestamp).getTime();
+                                return {
+                                    time: Math.floor(timestamp / 1000),
+                                    value: parseFloat(r.rate)
+                                };
+                            })
+                            .filter(d => d.time && !isNaN(d.time) && d.value !== undefined && !isNaN(d.value) && isFinite(d.value))
+                            .sort((a, b) => a.time - b.time);
+
+                        if (bcvData.length > 0 && !bcvData.some(d => d.value === undefined)) {
+                            this.bcvSeries.setData(bcvData);
+                        }
+                    }
+
+                    // Serie Binance (línea naranja)
+                    if (binanceRates.length > 0) {
+                        this.binanceSeries = this.chart.addLineSeries({
+                            color: '#f97316',
+                            lineWidth: 2,
+                            title: 'Binance P2P (Venta)',
+                            priceFormat: {
+                                type: 'price',
+                                precision: 4,
+                                minMove: 0.0001,
+                            },
+                        });
+
+                        const binanceData = binanceRates
+                            .map(r => {
+                                const timestamp = new Date(r.timestamp).getTime();
+                                return {
+                                    time: Math.floor(timestamp / 1000),
+                                    value: parseFloat(r.rate)
+                                };
+                            })
+                            .filter(d => d.time && !isNaN(d.time) && d.value !== undefined && !isNaN(d.value) && isFinite(d.value))
+                            .sort((a, b) => a.time - b.time);
+
+                        if (binanceData.length > 0 && !binanceData.some(d => d.value === undefined)) {
+                            this.binanceSeries.setData(binanceData);
+                        }
+                    }
+
+                    // Serie de Spread Porcentual (línea púrpura en eje izquierdo)
+                    if (bcvFilled.length > 0 && binanceRates.length > 0) {
+                        // Crear mapa de timestamps BCV para búsqueda rápida (ahora sincronizado!)
+                        const bcvMap = new Map();
+                        bcvFilled.forEach(r => {
+                            const rate = parseFloat(r.rate);
+                            if (!isNaN(rate) && isFinite(rate)) {
+                                bcvMap.set(r.timestamp, rate);
+                            }
+                        });
+
+                        // Calcular spread porcentual para cada punto de Binance
+                        const spreadData = [];
+                        binanceRates.forEach(r => {
+                            const timestamp = r.timestamp;
+                            const binanceRate = parseFloat(r.rate);
+                            const bcvRate = bcvMap.get(timestamp); // Ahora busca por timestamp exacto!
+
+                            if (bcvRate && !isNaN(binanceRate) && isFinite(binanceRate) && bcvRate > 0) {
+                                const spreadPercent = ((binanceRate - bcvRate) / bcvRate) * 100;
+                                const unixTime = Math.floor(new Date(timestamp).getTime() / 1000);
+
+                                // Validar que todos los valores sean válidos
+                                if (!isNaN(spreadPercent) && isFinite(spreadPercent) && !isNaN(unixTime)) {
+                                    spreadData.push({
+                                        time: unixTime,
+                                        value: spreadPercent
+                                    });
+                                }
+                            }
+                        });
+
+                        // Filtrar y ordenar datos del spread
+                        const spreadDataFiltered = spreadData
+                            .filter(d => d.time && !isNaN(d.time) && d.value !== undefined && !isNaN(d.value) && isFinite(d.value))
+                            .sort((a, b) => a.time - b.time);
+
+                        if (spreadDataFiltered.length > 0 && !spreadDataFiltered.some(d => d.value === undefined)) {
+                            this.spreadSeries = this.chart.addLineSeries({
+                                color: '#9333ea',
+                                lineWidth: 2,
+                                title: 'Spread % (Binance vs BCV)',
+                                priceScaleId: 'left',
+                                priceFormat: {
+                                    type: 'price',
+                                    precision: 2,
+                                    minMove: 0.01,
+                                },
+                            });
+
+                            this.spreadSeries.setData(spreadDataFiltered);
+                        }
+                    }
+
+                    // Ajustar vista automáticamente
+                    this.chart.timeScale().fitContent();
+
+                    // Hacer responsive
+                    new ResizeObserver(entries => {
+                        if (entries.length === 0 || !this.chart) return;
+                        const newWidth = entries[0].contentRect.width;
+                        this.chart.applyOptions({ width: newWidth });
+                    }).observe(container);
+                },
+
+
+                formatDate(dateStr) {
+                    const date = new Date(dateStr + 'T00:00:00');
+                    return date.toLocaleDateString('es-VE', {
+                        month: 'short',
+                        day: 'numeric'
+                    });
+                },
+
+                formatRate(rate) {
+                    if (!rate) return '-';
+                    return rate.toFixed(4) + ' Bs';
+                },
+
+                formatChange(change) {
+                    if (!change) return '-';
+                    const sign = change >= 0 ? '+' : '';
+                    return sign + change.toFixed(4) + ' Bs';
+                },
+
+                formatPercentage(percent) {
+                    if (!percent) return '-';
+                    const sign = percent >= 0 ? '+' : '';
+                    return sign + percent.toFixed(2) + '%';
+                }
+            }
+        }
+    </script>
+</body>
+</html>
