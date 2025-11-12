@@ -54,10 +54,10 @@ docker-compose exec web python manage.py test purchases
 # Update Binance P2P exchange rates (real-time, ~100 USD equivalent)
 docker-compose exec web python manage.py update_binance_rates
 
-# Import historical Binance rates from API
-docker-compose exec web python manage.py import_binance_rates --date 2025-11-02
+# Fetch historical Binance rates from external API
+docker-compose exec web python manage.py fetch_binance_rates --date 2025-11-02
 
-# Import BCV rates
+# Import BCV rates from bcv.json file
 docker-compose exec web python manage.py import_bcv_rates
 ```
 
@@ -113,7 +113,7 @@ docker-compose ps
      - Filters offers for ~100 USD equivalent in bolivares
      - Calculates simple average of 20 BUY and 20 SELL offers
      - Consults Binance P2P API directly (no intermediaries)
-   - Historical data import via `import_binance_rates` and `import_bcv_rates` commands
+   - Historical data import via `fetch_binance_rates` and `import_bcv_rates` commands
    - Each rate includes: source, rate (Bs/USD), date, timestamp, and notes
    - See `BINANCE_AUTO_UPDATE.md` for automated collection setup (every 15 minutes)
 

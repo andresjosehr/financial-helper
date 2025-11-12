@@ -1,10 +1,10 @@
 """
-Comando para importar tasas de Binance P2P desde el API
+Comando para importar tasas históricas de Binance P2P desde el API externo
 
 Uso:
-    docker compose exec web python manage.py import_binance_rates
-    docker compose exec web python manage.py import_binance_rates --date 2025-11-02
-    docker compose exec web python manage.py import_binance_rates --start-date 2025-10-03 --end-date 2025-11-02
+    docker compose exec web python manage.py fetch_binance_rates
+    docker compose exec web python manage.py fetch_binance_rates --date 2025-11-02
+    docker compose exec web python manage.py fetch_binance_rates --start-date 2025-10-03 --end-date 2025-11-02
 """
 
 import requests
@@ -15,7 +15,7 @@ from exchange_rates.models import ExchangeRate
 
 
 class Command(BaseCommand):
-    help = 'Importa tasas de Binance P2P desde el API'
+    help = 'Importa tasas históricas de Binance P2P desde el API externo'
 
     def add_arguments(self, parser):
         parser.add_argument(
