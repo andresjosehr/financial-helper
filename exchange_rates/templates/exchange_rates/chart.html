@@ -109,7 +109,7 @@
             <div x-show="stats.spreadStats" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
                 <div class="mb-6">
                     <h3 class="text-sm font-bold text-gray-900">Indicador de Spread Actual</h3>
-                    <p class="text-xs text-gray-500 mt-1">Visualización del spread actual en relación al rango histórico</p>
+                    <p class="text-xs text-gray-500 mt-1">Spread actual comparado con bandas históricas (excluyendo datos de hoy). Las bandas representan el comportamiento normal del período anterior.</p>
                 </div>
 
                 <!-- Visual indicator bar with breakpoints -->
@@ -361,7 +361,7 @@
                                 </div>
                             </div>
                         </div>
-                        <p class="text-xs text-gray-500 leading-relaxed">Área púrpura muestra la evolución del spread %. Líneas punteadas: naranja (media histórica), verde (percentil 75 - spread bueno), roja (percentil 25 - spread bajo). Te permite ver en contexto si el spread actual está alto o bajo comparado con el histórico.</p>
+                        <p class="text-xs text-gray-500 leading-relaxed">Área púrpura muestra la evolución del spread %. Líneas de referencia calculadas excluyendo datos de hoy: naranja (media histórica), verde (percentil 75 - spread bueno), roja (percentil 25 - spread bajo). Compara el spread actual contra el comportamiento normal del período anterior.</p>
                     </div>
                     <div class="p-5">
                         <div x-show="loading" class="flex justify-center items-center" style="height: 320px;">
@@ -474,7 +474,19 @@
                 },
 
                 calculateStats(bcvRates, binanceRates) {
-                    // Stats BCV
+                    // Determinar "hoy" (medianoche) para separar datos históricos
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const todayStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
+
+                    // Filtrar datos históricos (hasta ayer 23:59:59)
+                    const bcvHistorical = bcvRates.filter(r => r.date < todayStr);
+                    const binanceHistorical = binanceRates.filter(r => {
+                        const date = r.timestamp.split('T')[0];
+                        return date < todayStr;
+                    });
+
+                    // Stats BCV (usando TODOS los datos para mostrar valor actual)
                     if (bcvRates.length > 0) {
                         const bcvValues = bcvRates.map(r => r.rate);
                         this.stats.bcv = {
@@ -485,7 +497,7 @@
                         };
                     }
 
-                    // Stats Binance
+                    // Stats Binance (usando TODOS los datos para mostrar valor actual)
                     if (binanceRates.length > 0) {
                         const binanceValues = binanceRates.map(r => r.rate);
                         this.stats.binance = {
@@ -496,24 +508,25 @@
                         };
                     }
 
-                    // Calcular spread actual
+                    // Calcular spread actual (usando datos actuales)
                     if (this.stats.bcv && this.stats.binance) {
                         this.stats.spread = this.stats.binance.current - this.stats.bcv.current;
                         this.stats.spreadPercent = (this.stats.spread / this.stats.binance.current) * 100;
                     }
 
-                    // Calcular estadísticas del spread histórico
-                    if (bcvRates.length > 0 && binanceRates.length > 0) {
+                    // Calcular estadísticas del spread HISTÓRICO (excluyendo hoy)
+                    // Esto sirve como referencia estable para las bandas
+                    if (bcvHistorical.length > 0 && binanceHistorical.length > 0) {
                         const bcvMap = new Map();
-                        bcvRates.forEach(r => {
+                        bcvHistorical.forEach(r => {
                             bcvMap.set(r.date, parseFloat(r.rate));
                         });
 
-                        // Calcular spreads para todos los puntos de Binance
+                        // Calcular spreads para todos los puntos históricos de Binance
                         const spreadPercents = [];
                         const spreadBs = [];
 
-                        binanceRates.forEach(r => {
+                        binanceHistorical.forEach(r => {
                             const date = r.timestamp.split('T')[0];
                             const bcvRate = bcvMap.get(date);
                             const binanceRate = parseFloat(r.rate);
@@ -542,6 +555,62 @@
                             const stdDev = Math.sqrt(variance);
 
                             // Calcular percentiles
+                            const p25 = sortedPercents[Math.floor(sortedPercents.length * 0.25)];
+                            const p50 = sortedPercents[Math.floor(sortedPercents.length * 0.50)];
+                            const p75 = sortedPercents[Math.floor(sortedPercents.length * 0.75)];
+
+                            this.stats.spreadStats = {
+                                avg: avg,
+                                avgBs: avgBs,
+                                max: Math.max(...spreadPercents),
+                                min: Math.min(...spreadPercents),
+                                maxBs: Math.max(...spreadBs),
+                                minBs: Math.min(...spreadBs),
+                                stdDev: stdDev,
+                                p25: p25,
+                                p50: p50,
+                                p75: p75,
+                                spreadPercents: spreadPercents,
+                                spreadBs: spreadBs
+                            };
+                        }
+                    } else if (bcvRates.length > 0 && binanceRates.length > 0) {
+                        // Fallback: Si no hay datos históricos suficientes, usar todos los datos
+                        // Esto puede pasar si solo estamos viendo datos de hoy
+                        const bcvMap = new Map();
+                        bcvRates.forEach(r => {
+                            bcvMap.set(r.date, parseFloat(r.rate));
+                        });
+
+                        const spreadPercents = [];
+                        const spreadBs = [];
+
+                        binanceRates.forEach(r => {
+                            const date = r.timestamp.split('T')[0];
+                            const bcvRate = bcvMap.get(date);
+                            const binanceRate = parseFloat(r.rate);
+
+                            if (bcvRate && !isNaN(binanceRate) && binanceRate > 0 && bcvRate > 0) {
+                                const spreadPct = ((binanceRate - bcvRate) / binanceRate) * 100;
+                                const spreadB = binanceRate - bcvRate;
+
+                                if (!isNaN(spreadPct) && isFinite(spreadPct)) {
+                                    spreadPercents.push(spreadPct);
+                                    spreadBs.push(spreadB);
+                                }
+                            }
+                        });
+
+                        if (spreadPercents.length > 0) {
+                            const sortedPercents = [...spreadPercents].sort((a, b) => a - b);
+                            const sortedBs = [...spreadBs].sort((a, b) => a - b);
+
+                            const avg = spreadPercents.reduce((a, b) => a + b, 0) / spreadPercents.length;
+                            const avgBs = spreadBs.reduce((a, b) => a + b, 0) / spreadBs.length;
+
+                            const variance = spreadPercents.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / spreadPercents.length;
+                            const stdDev = Math.sqrt(variance);
+
                             const p25 = sortedPercents[Math.floor(sortedPercents.length * 0.25)];
                             const p50 = sortedPercents[Math.floor(sortedPercents.length * 0.50)];
                             const p75 = sortedPercents[Math.floor(sortedPercents.length * 0.75)];
