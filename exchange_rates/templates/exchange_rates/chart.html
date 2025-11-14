@@ -116,6 +116,7 @@
                 <div class="relative px-2">
                     <!-- Current value marker (above bar) -->
                     <div class="relative h-8 mb-0.5">
+                        <!-- Marcador del valor actual (indigo) -->
                         <div
                             class="absolute bottom-0 transform -translate-x-1/2 z-30"
                             :style="'left: ' + Math.min(100, Math.max(0, ((stats.spreadPercent - (stats.spreadStats?.min || 0)) / ((stats.spreadStats?.max || 100) - (stats.spreadStats?.min || 0))) * 100)) + '%'"
@@ -133,6 +134,21 @@
                                 ></div>
                             </div>
                             <div class="w-px h-3 bg-indigo-600 mx-auto mt-0.5"></div>
+                        </div>
+
+                        <!-- Marcador del promedio histórico (amber) -->
+                        <div
+                            x-show="stats.spreadStats?.avg"
+                            class="absolute bottom-0 transform -translate-x-1/2 z-20"
+                            :style="'left: ' + Math.min(100, Math.max(0, ((stats.spreadStats?.avg - (stats.spreadStats?.min || 0)) / ((stats.spreadStats?.max || 100) - (stats.spreadStats?.min || 0))) * 100)) + '%'"
+                        >
+                            <div class="text-center">
+                                <div class="text-xs font-bold text-amber-600 leading-none mb-0.5" x-text="formatPercentage(stats.spreadStats?.avg)"></div>
+                                <div class="text-[8px] font-medium uppercase px-1 py-px bg-amber-50 text-amber-700 rounded-full inline-block leading-none">
+                                    PROMEDIO
+                                </div>
+                            </div>
+                            <div class="w-px h-3 bg-amber-500 mx-auto mt-0.5"></div>
                         </div>
                     </div>
 
