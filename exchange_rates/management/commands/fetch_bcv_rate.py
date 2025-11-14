@@ -59,6 +59,8 @@ class Command(BaseCommand):
         if test_rate:
             try:
                 current_rate = Decimal(test_rate)
+                # Cuantizar a 4 decimales para asegurar compatibilidad con el modelo
+                current_rate = current_rate.quantize(Decimal('0.0001'))
                 rate_date = date.today()
                 self.stdout.write(
                     self.style.WARNING(f'⚠ Usando tasa de prueba: {current_rate:,.4f} Bs/USD')
@@ -243,6 +245,8 @@ class Command(BaseCommand):
 
                             # Validar que sea una tasa razonable (entre 50 y 500 Bs/USD)
                             if Decimal('50') <= rate_value <= Decimal('500'):
+                                # Cuantizar a 4 decimales para asegurar compatibilidad con el modelo
+                                rate_value = rate_value.quantize(Decimal('0.0001'))
                                 return {
                                     'rate': rate_value,
                                     'date': date.today()
@@ -319,7 +323,8 @@ class Command(BaseCommand):
 
                                 # Validar que sea una tasa razonable (entre 50 y 500)
                                 if Decimal('50') <= rate_value <= Decimal('500'):
-                                    rate = rate_value
+                                    # Cuantizar a 4 decimales para asegurar compatibilidad con el modelo
+                                    rate = rate_value.quantize(Decimal('0.0001'))
                                     break
                             except (InvalidOperation, ValueError):
                                 continue
@@ -351,7 +356,8 @@ class Command(BaseCommand):
                                         rate_str = num.replace(',', '.')
                                         rate_value = Decimal(rate_str)
                                         if Decimal('50') <= rate_value <= Decimal('500'):
-                                            rate = rate_value
+                                            # Cuantizar a 4 decimales para asegurar compatibilidad con el modelo
+                                            rate = rate_value.quantize(Decimal('0.0001'))
                                             break
                                     except (InvalidOperation, ValueError):
                                         continue
