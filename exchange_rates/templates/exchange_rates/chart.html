@@ -84,7 +84,7 @@
                                 'bg-amber-100 text-amber-700': getSpreadIndicator() === 'medium',
                                 'bg-red-100 text-red-700': getSpreadIndicator() === 'low'
                             }"
-                            x-text="getSpreadIndicator() === 'high' ? 'ALTO' : getSpreadIndicator() === 'medium' ? 'MEDIO' : 'BAJO'"
+                            x-text="getSpreadIndicator() === 'high' ? 'EXCELENTE' : getSpreadIndicator() === 'medium' ? 'BUENO' : 'BAJO'"
                         ></span>
                     </div>
                     <div class="text-3xl font-bold text-indigo-600 mb-1" x-text="formatPercentage(stats.spreadPercent)"></div>
@@ -140,7 +140,7 @@
                             <div class="w-px h-4 bg-red-400 mx-auto"></div>
                             <div class="text-center mt-1 min-w-max">
                                 <div class="text-xs font-bold text-red-600" x-text="formatPercentage(stats.spreadStats?.min)"></div>
-                                <div class="text-[10px] font-medium text-gray-400 uppercase">Malo</div>
+                                <div class="text-[10px] font-medium text-gray-400 uppercase">Bajo</div>
                             </div>
                         </div>
 
@@ -152,7 +152,7 @@
                             <div class="w-px h-4 bg-amber-400 mx-auto"></div>
                             <div class="text-center mt-1 min-w-max">
                                 <div class="text-xs font-bold text-amber-600" x-text="formatPercentage(stats.spreadStats?.avg)"></div>
-                                <div class="text-[10px] font-medium text-gray-400 uppercase">Regular</div>
+                                <div class="text-[10px] font-medium text-gray-400 uppercase">Bueno</div>
                             </div>
                         </div>
 
@@ -164,7 +164,7 @@
                             <div class="w-px h-4 bg-lime-400 mx-auto"></div>
                             <div class="text-center mt-1 min-w-max">
                                 <div class="text-xs font-bold text-lime-600" x-text="formatPercentage(stats.spreadStats?.p75)"></div>
-                                <div class="text-[10px] font-medium text-gray-400 uppercase">Bueno</div>
+                                <div class="text-[10px] font-medium text-gray-400 uppercase">Excelente</div>
                             </div>
                         </div>
 
@@ -173,7 +173,7 @@
                             <div class="w-px h-4 bg-green-400 mx-auto"></div>
                             <div class="text-center mt-1 min-w-max">
                                 <div class="text-xs font-bold text-green-600" x-text="formatPercentage(stats.spreadStats?.max)"></div>
-                                <div class="text-[10px] font-medium text-gray-400 uppercase">Excelente</div>
+                                <div class="text-[10px] font-medium text-gray-400 uppercase">Máximo</div>
                             </div>
                         </div>
                     </div>
@@ -886,7 +886,7 @@
 
                 formatRate(rate) {
                     if (!rate) return '-';
-                    return rate.toFixed(4) + ' Bs';
+                    return rate.toFixed(2) + ' Bs';
                 },
 
                 formatChange(change) {
@@ -915,9 +915,9 @@
 
                 getSpreadLabel() {
                     const indicator = this.getSpreadIndicator();
-                    if (indicator === 'high') return '🟢 EXCELENTE';
-                    if (indicator === 'medium') return '🟡 BUENO';
-                    return '🔴 BAJO';
+                    if (indicator === 'high') return 'EXCELENTE';
+                    if (indicator === 'medium') return 'BUENO';
+                    return 'BAJO';
                 },
 
                 formatBsShort(value) {
