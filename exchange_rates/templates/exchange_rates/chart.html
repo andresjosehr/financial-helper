@@ -75,16 +75,32 @@
 
                 <!-- Calculator Quick -->
                 <div class="bg-gradient-to-br from-emerald-600 to-teal-600 rounded-lg shadow-sm p-4 card text-white">
-                    <div class="text-xs font-semibold uppercase tracking-wide mb-3 opacity-90">Calculadora</div>
-                    <input
-                        type="number"
-                        x-model="usdAmount"
-                        @input="calculateConversion()"
-                        placeholder="100"
-                        class="w-full px-3 py-2 bg-white/20 border border-white/30 rounded text-sm font-semibold text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50 mb-2"
-                    >
-                    <div class="text-xl font-bold" x-text="formatUsd(usdBinance)"></div>
-                    <div class="text-xs opacity-75">en Binance</div>
+                    <div class="text-xs font-semibold uppercase tracking-wide mb-3 opacity-90">Calculadora Bidireccional</div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <!-- Campo BCV -->
+                        <div>
+                            <label class="text-[10px] opacity-75 mb-1 block uppercase tracking-wide">BCV</label>
+                            <input
+                                type="number"
+                                x-model="bcvAmount"
+                                @input="calculateFromBcv()"
+                                placeholder="100"
+                                class="w-full px-3 py-1.5 bg-white/20 border border-white/30 rounded text-sm font-semibold text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50"
+                            >
+                        </div>
+                        <!-- Campo Binance -->
+                        <div>
+                            <label class="text-[10px] opacity-75 mb-1 block uppercase tracking-wide">Binance</label>
+                            <input
+                                type="number"
+                                x-model="binanceAmount"
+                                @input="calculateFromBinance()"
+                                placeholder="100"
+                                class="w-full px-3 py-1.5 bg-white/20 border border-white/30 rounded text-sm font-semibold text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50"
+                            >
+                        </div>
+                    </div>
+                    <div class="text-[10px] opacity-75 mt-2 text-center">USD equivalentes según tasas actuales</div>
                 </div>
 
             </div>
@@ -288,28 +304,37 @@
                 },
                 bcvDataPoints: 0,
                 binanceDataPoints: 0,
-                usdAmount: 100,
-                usdBinance: 0,
-                usdDifference: 0,
+                bcvAmount: 100,
+                binanceAmount: 0,
 
                 init() {
                     this.fetchData();
                 },
 
-                calculateConversion() {
-                    if (!this.stats.bcv || !this.stats.binance || !this.usdAmount) {
-                        this.usdBinance = 0;
-                        this.usdDifference = 0;
+                calculateFromBcv() {
+                    if (!this.stats.bcv || !this.stats.binance || !this.bcvAmount) {
+                        this.binanceAmount = '';
                         return;
                     }
 
-                    const usdBcv = parseFloat(this.usdAmount) || 0;
+                    const usdBcv = parseFloat(this.bcvAmount) || 0;
                     // USD BCV → Bs (usando tasa BCV)
                     const bsTotal = usdBcv * this.stats.bcv.current;
                     // Bs → USD Binance (usando tasa Binance)
-                    this.usdBinance = bsTotal / this.stats.binance.current;
-                    // Diferencia en USD
-                    this.usdDifference = this.usdBinance - usdBcv;
+                    this.binanceAmount = (bsTotal / this.stats.binance.current).toFixed(2);
+                },
+
+                calculateFromBinance() {
+                    if (!this.stats.bcv || !this.stats.binance || !this.binanceAmount) {
+                        this.bcvAmount = '';
+                        return;
+                    }
+
+                    const usdBinance = parseFloat(this.binanceAmount) || 0;
+                    // USD Binance → Bs (usando tasa Binance)
+                    const bsTotal = usdBinance * this.stats.binance.current;
+                    // Bs → USD BCV (usando tasa BCV)
+                    this.bcvAmount = (bsTotal / this.stats.bcv.current).toFixed(2);
                 },
 
                 async fetchData() {
@@ -338,7 +363,7 @@
 
 
                         this.calculateStats(data.bcv, data.binance_sell);
-                        this.calculateConversion();
+                        this.calculateFromBcv();
                         this.renderChart(data.bcv, data.binance_sell);
 
                     } catch (err) {
