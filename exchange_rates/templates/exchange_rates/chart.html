@@ -41,11 +41,9 @@
                         <h1 class="text-2xl font-bold text-gray-900">Tasas de Cambio VES/USD</h1>
                         <p class="text-sm text-gray-500 mt-1">Monitoreo en tiempo real</p>
                     </div>
-                    <div class="text-right text-xs text-gray-500" x-show="startDate && endDate">
-                        <div><span x-text="startDate"></span> — <span x-text="endDate"></span></div>
-                        <div class="mt-0.5" x-show="bcvDataPoints || binanceDataPoints">
-                            <span x-text="bcvDataPoints"></span> BCV · <span x-text="binanceDataPoints"></span> Binance
-                        </div>
+                    <div class="text-right text-xs text-gray-500" x-show="lastBinanceDate">
+                        <div>Última actualización:</div>
+                        <div class="mt-0.5 font-medium" x-text="formatDateTime(lastBinanceDate)"></div>
                     </div>
                 </div>
             </div>
@@ -392,6 +390,7 @@
                 binanceDataPoints: 0,
                 bcvAmount: 100,
                 binanceAmount: 0,
+                lastBinanceDate: null,
 
                 init() {
                     this.fetchData();
@@ -449,6 +448,7 @@
 
 
                         this.calculateStats(data.bcv, data.binance_sell);
+                        this.lastBinanceDate = data.binance_sell.length > 0 ? data.binance_sell[data.binance_sell.length - 1].timestamp : null;
                         this.calculateFromBcv();
                         this.renderAllCharts(data.bcv, data.binance_sell);
 
@@ -802,6 +802,7 @@
                             if (data) {
                                 const date = new Date(param.time * 1000);
                                 const formattedDate = date.toLocaleString('es-VE', {
+                                    timeZone: 'America/Caracas',
                                     year: 'numeric',
                                     month: 'short',
                                     day: 'numeric',
@@ -976,6 +977,7 @@
                             if (histData || lineData) {
                                 const date = new Date(param.time * 1000);
                                 const formattedDate = date.toLocaleString('es-VE', {
+                                    timeZone: 'America/Caracas',
                                     year: 'numeric',
                                     month: 'short',
                                     day: 'numeric',
@@ -1265,6 +1267,18 @@
                     if (current >= p75) return 'high';
                     if (current >= avg) return 'medium';
                     return 'low';
+                },
+
+                formatDateTime(timestamp) {
+                    if (!timestamp) return '-';
+                    return new Date(timestamp).toLocaleString('es-VE', {
+                        timeZone: 'America/Caracas',
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
                 }
             }
         }
