@@ -5,7 +5,14 @@ Estrategia de consulta:
 1. Primera consulta SIN transAmount para obtener la mejor tasa actual
 2. Calcular equivalente de 100 USD en VES con esa tasa
 3. Segunda consulta CON transAmount en VES para filtrar ofertas de ~100 USD
-4. Guardar el promedio simple de los precios
+4. Limpiar valores atípicos usando el método IQR (Interquartile Range)
+5. Guardar el promedio de los precios limpios
+
+Método de limpieza de outliers (IQR):
+- Calcula Q1 (cuartil 25%) y Q3 (cuartil 75%)
+- Define IQR = Q3 - Q1
+- Descarta valores fuera del rango [Q1 - 1.5*IQR, Q3 + 1.5*IQR]
+- Esto elimina ofertas con precios anormalmente altos o bajos que afectan el promedio
 
 Uso:
     docker compose exec web python manage.py update_binance_rates
@@ -16,6 +23,7 @@ from decimal import Decimal
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from exchange_rates.models import ExchangeRate
+import statistics
 
 
 class Command(BaseCommand):
@@ -26,6 +34,46 @@ class Command(BaseCommand):
     FIAT = 'VES'
     TARGET_USD = 100  # Queremos ofertas para ~100 USD
     ROWS = 20  # Número de ofertas a promediar
+
+    def _remove_outliers(self, prices):
+        """
+        Elimina valores atípicos usando el método IQR (Interquartile Range)
+
+        Args:
+            prices: Lista de precios
+
+        Returns:
+            tuple: (precios_limpios, outliers_removidos, stats_dict)
+        """
+        if len(prices) < 4:
+            # No suficientes datos para calcular IQR
+            return prices, [], None
+
+        # Calcular cuartiles
+        q1 = statistics.quantiles(prices, n=4)[0]  # Cuartil 25%
+        q3 = statistics.quantiles(prices, n=4)[2]  # Cuartil 75%
+        iqr = q3 - q1
+
+        # Definir límites (1.5 * IQR es el estándar)
+        lower_bound = q1 - 1.5 * iqr
+        upper_bound = q3 + 1.5 * iqr
+
+        # Filtrar outliers
+        cleaned_prices = [p for p in prices if lower_bound <= p <= upper_bound]
+        outliers = [p for p in prices if p < lower_bound or p > upper_bound]
+
+        stats = {
+            'q1': q1,
+            'q3': q3,
+            'iqr': iqr,
+            'lower_bound': lower_bound,
+            'upper_bound': upper_bound,
+            'original_count': len(prices),
+            'cleaned_count': len(cleaned_prices),
+            'outliers_count': len(outliers)
+        }
+
+        return cleaned_prices, outliers, stats
 
     def handle(self, *args, **options):
         self.stdout.write('🔍 Consultando Binance P2P API...')
@@ -70,30 +118,64 @@ class Command(BaseCommand):
                 )
                 return
 
-            # PASO 4: Calcular promedios simples
-            buy_prices = [float(ad['adv']['price']) for ad in buy_data.get('data', [])]
-            sell_prices = [float(ad['adv']['price']) for ad in sell_data.get('data', [])]
+            # PASO 4: Extraer precios y limpiar outliers
+            buy_prices_raw = [float(ad['adv']['price']) for ad in buy_data.get('data', [])]
+            sell_prices_raw = [float(ad['adv']['price']) for ad in sell_data.get('data', [])]
 
-            if not buy_prices or not sell_prices:
+            if not buy_prices_raw or not sell_prices_raw:
                 self.stdout.write(
                     self.style.ERROR('❌ Error: No hay ofertas disponibles')
                 )
                 return
 
+            # Limpiar outliers con método IQR
+            self.stdout.write('  🧹 Limpiando valores atípicos (método IQR)...')
+
+            buy_prices, buy_outliers, buy_stats = self._remove_outliers(buy_prices_raw)
+            sell_prices, sell_outliers, sell_stats = self._remove_outliers(sell_prices_raw)
+
+            # Validar que queden suficientes datos después de limpiar
+            if not buy_prices or not sell_prices:
+                self.stdout.write(
+                    self.style.ERROR('❌ Error: No hay suficientes ofertas válidas después de limpiar outliers')
+                )
+                return
+
+            # Calcular promedios con datos limpios
             avg_buy = sum(buy_prices) / len(buy_prices)
             avg_sell = sum(sell_prices) / len(sell_prices)
 
-            self.stdout.write(f'  📊 Ofertas BUY: {len(buy_prices)} - Rango: {min(buy_prices):.4f} - {max(buy_prices):.4f}')
-            self.stdout.write(f'  📊 Ofertas SELL: {len(sell_prices)} - Rango: {min(sell_prices):.4f} - {max(sell_prices):.4f}')
+            # Mostrar estadísticas detalladas
+            self.stdout.write(f'  📊 Ofertas BUY:')
+            self.stdout.write(f'     • Original: {len(buy_prices_raw)} ofertas - Rango: {min(buy_prices_raw):.4f} - {max(buy_prices_raw):.4f}')
+            if buy_stats and buy_outliers:
+                self.stdout.write(f'     • Outliers removidos: {len(buy_outliers)} ({", ".join([f"{o:.4f}" for o in buy_outliers])})')
+                self.stdout.write(f'     • Límites IQR: [{buy_stats["lower_bound"]:.4f}, {buy_stats["upper_bound"]:.4f}]')
+            self.stdout.write(f'     • Final: {len(buy_prices)} ofertas - Promedio: {avg_buy:.4f}')
+
+            self.stdout.write(f'  📊 Ofertas SELL:')
+            self.stdout.write(f'     • Original: {len(sell_prices_raw)} ofertas - Rango: {min(sell_prices_raw):.4f} - {max(sell_prices_raw):.4f}')
+            if sell_stats and sell_outliers:
+                self.stdout.write(f'     • Outliers removidos: {len(sell_outliers)} ({", ".join([f"{o:.4f}" for o in sell_outliers])})')
+                self.stdout.write(f'     • Límites IQR: [{sell_stats["lower_bound"]:.4f}, {sell_stats["upper_bound"]:.4f}]')
+            self.stdout.write(f'     • Final: {len(sell_prices)} ofertas - Promedio: {avg_sell:.4f}')
 
             # Guardar en la base de datos
+            buy_note = f'Promedio de {len(buy_prices)} ofertas P2P'
+            if buy_outliers:
+                buy_note += f' ({len(buy_outliers)} outlier(s) removido(s) con IQR)'
+
+            sell_note = f'Promedio de {len(sell_prices)} ofertas P2P'
+            if sell_outliers:
+                sell_note += f' ({len(sell_outliers)} outlier(s) removido(s) con IQR)'
+
             buy_rate, buy_created = ExchangeRate.objects.update_or_create(
                 source=ExchangeRate.SOURCE_BINANCE_BUY,
                 timestamp=now,
                 defaults={
                     'date': now.date(),
                     'rate': Decimal(str(avg_buy)).quantize(Decimal('0.0001')),
-                    'notes': f'Promedio simple de {len(buy_prices)} ofertas P2P'
+                    'notes': buy_note
                 }
             )
 
@@ -103,7 +185,7 @@ class Command(BaseCommand):
                 defaults={
                     'date': now.date(),
                     'rate': Decimal(str(avg_sell)).quantize(Decimal('0.0001')),
-                    'notes': f'Promedio simple de {len(sell_prices)} ofertas P2P'
+                    'notes': sell_note
                 }
             )
 

@@ -394,6 +394,10 @@
 
                 init() {
                     this.fetchData();
+                    // Actualizar datos cada 5 minutos (300000 ms)
+                    setInterval(() => {
+                        this.fetchData();
+                    }, 300000);
                 },
 
                 calculateFromBcv() {
