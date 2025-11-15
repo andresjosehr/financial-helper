@@ -3,6 +3,7 @@ from django.urls import path, include
 from django.http import JsonResponse
 from products.views import get_products_by_categories
 from exchange_rates.views import chart_view
+from config.backup_views import download_database_backup
 
 def api_status(request):
     return JsonResponse({
@@ -13,6 +14,7 @@ def api_status(request):
             'image_processor_test': '/image-processor/test/',
             'process_invoice': '/api/process-invoice/',
             'products_by_categories': '/api/products/by-categories/',
+            'database_backup': '/api/backup/download/',
         }
     })
 
@@ -25,4 +27,5 @@ urlpatterns = [
     path('api/products/by-categories/', get_products_by_categories, name='products-by-categories'),
     path('exchange-rates/', include('exchange_rates.urls')),
     path('api/exchange-rates/', include('exchange_rates.urls')),
+    path('api/backup/download/', download_database_backup, name='backup-download'),
 ]

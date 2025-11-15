@@ -68,11 +68,24 @@ docker-compose exec web python manage.py import_bcv_rates
 docker-compose exec db mysql -u django_user -p financial_helper
 # Password: django_password (or from .env)
 
-# Database backup
+# Database backup (manual via shell)
 docker-compose exec db mysqldump -u root -p financial_helper > backup.sql
+
+# Database backup (via API endpoint - recommended)
+curl -X POST "http://localhost:8000/api/backup/download/" \
+  -H "Authorization: Bearer financial-helper-backup-secret-2024" \
+  --output backup_$(date +%Y%m%d_%H%M%S).sql.gz
+
+# Production backup
+curl -X POST "https://financial-helper.andresjosehr.com/api/backup/download/" \
+  -H "Authorization: Bearer financial-helper-backup-secret-2024" \
+  --output backup_$(date +%Y%m%d_%H%M%S).sql.gz
 
 # Database restore
 docker-compose exec -T db mysql -u root -p financial_helper < backup.sql
+
+# Restore from compressed backup
+gunzip -c backup.sql.gz | docker-compose exec -T db mysql -u root -p financial_helper
 ```
 
 ### Development Workflow
@@ -215,3 +228,108 @@ Managed by WhiteNoise middleware. `collectstatic` runs automatically on containe
 - Home (status): `http://localhost:8000/` - Returns JSON with API status
 - Admin: `http://localhost:8000/admin/`
 - Database: `localhost:3306` (from host machine)
+- **Backup Download**: `POST /api/backup/download/` - Download compressed database backup (requires Bearer token)
+
+## Database Backup API
+
+The application provides a secure API endpoint for downloading complete database backups.
+
+### Endpoint Details
+
+- **URL**: `/api/backup/download/`
+- **Method**: `POST` or `GET`
+- **Authentication**: Bearer token (hardcoded)
+- **Response**: Compressed `.sql.gz` file with complete database dump
+
+### Authentication
+
+The endpoint requires a Bearer token in the Authorization header:
+
+```bash
+Authorization: Bearer financial-helper-backup-secret-2024
+```
+
+**Security Token**: The token is hardcoded in `config/backup_views.py` (line 40):
+```python
+HARDCODED_TOKEN = 'financial-helper-backup-secret-2024'
+```
+
+To change the token, edit this constant and restart the web container.
+
+### Usage Examples
+
+**Local development**:
+```bash
+curl -X POST "http://localhost:8000/api/backup/download/" \
+  -H "Authorization: Bearer financial-helper-backup-secret-2024" \
+  --output backup_$(date +%Y%m%d_%H%M%S).sql.gz
+```
+
+**Production**:
+```bash
+curl -X POST "https://financial-helper.andresjosehr.com/api/backup/download/" \
+  -H "Authorization: Bearer financial-helper-backup-secret-2024" \
+  --output backup_$(date +%Y%m%d_%H%M%S).sql.gz
+```
+
+### What's Included in the Backup
+
+The backup includes:
+- All table structures (CREATE TABLE statements with DROP TABLE IF EXISTS)
+- All data from all tables (INSERT statements)
+- MySQL configuration variables preservation
+- Proper character set and collation settings
+- Transaction safety with LOCK TABLES
+
+### Backup File Format
+
+- **Compression**: gzip level 9 (maximum compression)
+- **Format**: Standard MySQL dump SQL
+- **Naming**: `financial_helper_backup_YYYYMMDD_HHMMSS.sql.gz`
+- **Size**: Typically ~100KB compressed (depends on data volume)
+
+### Restoring from Backup
+
+```bash
+# Decompress and restore
+gunzip -c backup.sql.gz | docker-compose exec -T db mysql -u root -p financial_helper
+
+# Or decompress first, then restore
+gunzip backup.sql.gz
+docker-compose exec -T db mysql -u root -p financial_helper < backup.sql
+```
+
+### Error Responses
+
+**Missing or invalid token**:
+```json
+{
+  "error": "Unauthorized",
+  "message": "Missing or invalid Authorization header. Format: Bearer <token>"
+}
+```
+
+**Wrong token**:
+```json
+{
+  "error": "Unauthorized",
+  "message": "Invalid authorization token"
+}
+```
+
+**Database error**:
+```json
+{
+  "error": "Internal server error",
+  "message": "<error details>"
+}
+```
+
+### Implementation Details
+
+The backup system is implemented in `config/backup_views.py` and uses:
+- Pure Python MySQL dump generation (no external `mysqldump` required)
+- MySQLdb/mysqlclient library for database connection
+- Temporary files for processing
+- Automatic cleanup of temporary files
+- Streaming response for large databases
