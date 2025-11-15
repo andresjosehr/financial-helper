@@ -772,12 +772,16 @@
 
                     // Configurar zoom inicial a últimos 7 días
                     if (bcvData.length > 0) {
-                        const now = Math.floor(Date.now() / 1000);
-                        const sevenDaysAgo = now - (7 * 24 * 60 * 60);
-                        this.charts.bcvRate.timeScale().setVisibleRange({
-                            from: sevenDaysAgo,
-                            to: now
-                        });
+                        setTimeout(() => {
+                            // Calcular el timestamp de hace 7 días desde el último dato
+                            const lastDataPoint = bcvData[bcvData.length - 1];
+                            const sevenDaysAgo = lastDataPoint.time - (7 * 24 * 60 * 60);
+
+                            this.charts.bcvRate.timeScale().setVisibleRange({
+                                from: sevenDaysAgo,
+                                to: lastDataPoint.time + (60 * 60) // +1 hora de margen
+                            });
+                        }, 100);
                     }
 
                     this.makeResponsive(container, this.charts.bcvRate);
@@ -842,12 +846,16 @@
 
                     // Configurar zoom inicial a últimas 24 horas
                     if (binanceData.length > 0) {
-                        const now = Math.floor(Date.now() / 1000);
-                        const oneDayAgo = now - (24 * 60 * 60);
-                        this.charts.binanceRate.timeScale().setVisibleRange({
-                            from: oneDayAgo,
-                            to: now
-                        });
+                        setTimeout(() => {
+                            // Calcular el timestamp de hace 24 horas
+                            const lastDataPoint = binanceData[binanceData.length - 1];
+                            const oneDayAgo = lastDataPoint.time - (24 * 60 * 60);
+
+                            this.charts.binanceRate.timeScale().setVisibleRange({
+                                from: oneDayAgo,
+                                to: lastDataPoint.time + (60 * 60) // +1 hora de margen
+                            });
+                        }, 100);
                     }
 
                     this.makeResponsive(container, this.charts.binanceRate);

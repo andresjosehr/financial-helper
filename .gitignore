@@ -36,3 +36,7 @@ Thumbs.db
 *.sql
 *.sqlite
 logs/*.log
+
+
+backup.sql.gz
+restore_database.md
