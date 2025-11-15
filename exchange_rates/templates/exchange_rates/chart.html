@@ -216,7 +216,54 @@
             <!-- Charts Grid -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-                <!-- Chart 1: Tasa BCV -->
+                <!-- Chart 1: Spread Dual (Bs + %) -->
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 lg:col-span-2">
+                    <div class="px-5 py-4 border-b border-gray-200">
+                        <div class="flex items-center justify-between mb-2">
+                            <div>
+                                <h2 class="text-base font-bold text-gray-900">Spread Absoluto y Relativo</h2>
+                            </div>
+                            <div class="flex items-center gap-3 text-xs font-medium">
+                                <div class="flex items-center gap-1.5">
+                                    <div class="w-3 h-2 bg-emerald-600 rounded"></div>
+                                    <span class="text-gray-600">Bs</span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <div class="w-3 h-0.5 bg-purple-600 rounded-full"></div>
+                                    <span class="text-gray-600">%</span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <div class="w-3 h-0.5 bg-amber-500 rounded-full"></div>
+                                    <span class="text-gray-600">Media</span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <div class="w-3 h-0.5 bg-emerald-600 rounded-full"></div>
+                                    <span class="text-gray-600">P75</span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <div class="w-3 h-0.5 bg-red-600 rounded-full"></div>
+                                    <span class="text-gray-600">MIN</span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <div class="w-3 h-0.5 bg-blue-600 rounded-full"></div>
+                                    <span class="text-gray-600">MAX</span>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 leading-relaxed">Histograma verde muestra el spread en Bs (eje derecho) y línea púrpura el spread en % (eje izquierdo). Líneas continuas muestran bandas estadísticas históricas: naranja (media), verde (percentil 75), roja (mínimo), azul (máximo). Dual scale para ver ambas métricas simultáneamente.</p>
+                    </div>
+                    <div class="p-5">
+                        <div x-show="loading" class="flex justify-center items-center" style="height: 400px;">
+                            <div class="w-10 h-10 border-4 border-gray-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                        </div>
+                        <div x-show="!loading && !error" class="relative">
+                            <div id="spreadDualChart" class="w-full" style="height: 400px;"></div>
+                            <div id="spreadDualTooltip" class="absolute bg-black text-white p-2 rounded shadow-lg pointer-events-none opacity-0 transition-opacity duration-200 z-50 text-sm"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chart 2: Tasa BCV -->
                 <div class="bg-white rounded-lg shadow-sm border border-gray-200">
                     <div class="px-5 py-4 border-b border-gray-200">
                         <div class="flex items-center justify-between mb-2">
@@ -240,7 +287,7 @@
                     </div>
                 </div>
 
-                <!-- Chart 2: Tasa Binance -->
+                <!-- Chart 3: Tasa Binance -->
                 <div class="bg-white rounded-lg shadow-sm border border-gray-200">
                     <div class="px-5 py-4 border-b border-gray-200">
                         <div class="flex items-center justify-between mb-2">
@@ -258,43 +305,14 @@
                         <div x-show="loading" class="flex justify-center items-center" style="height: 320px;">
                             <div class="w-10 h-10 border-4 border-gray-200 border-t-indigo-600 rounded-full animate-spin"></div>
                         </div>
-                        <div x-show="!loading && !error">
+                        <div x-show="!loading && !error" class="relative">
                             <div id="binanceRateChart" class="w-full" style="height: 320px;"></div>
+                            <div id="binanceTooltip" class="absolute bg-black text-white p-2 rounded shadow-lg pointer-events-none opacity-0 transition-opacity duration-200 z-50 text-sm"></div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Chart 3: Spread Dual (Bs + %) -->
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-                    <div class="px-5 py-4 border-b border-gray-200">
-                        <div class="flex items-center justify-between mb-2">
-                            <div>
-                                <h2 class="text-base font-bold text-gray-900">Spread Absoluto y Relativo</h2>
-                            </div>
-                            <div class="flex items-center gap-3 text-xs font-medium">
-                                <div class="flex items-center gap-1.5">
-                                    <div class="w-3 h-2 bg-emerald-600 rounded"></div>
-                                    <span class="text-gray-600">Bs</span>
-                                </div>
-                                <div class="flex items-center gap-1.5">
-                                    <div class="w-3 h-0.5 bg-purple-600 rounded-full"></div>
-                                    <span class="text-gray-600">%</span>
-                                </div>
-                            </div>
-                        </div>
-                        <p class="text-xs text-gray-500 leading-relaxed">Histograma verde muestra el spread en Bs (eje derecho) y línea púrpura el spread en % (eje izquierdo). Dual scale para ver ambas métricas simultáneamente.</p>
-                    </div>
-                    <div class="p-5">
-                        <div x-show="loading" class="flex justify-center items-center" style="height: 320px;">
-                            <div class="w-10 h-10 border-4 border-gray-200 border-t-indigo-600 rounded-full animate-spin"></div>
-                        </div>
-                        <div x-show="!loading && !error">
-                            <div id="spreadDualChart" class="w-full" style="height: 320px;"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Chart 3: Volatilidad Diaria -->
+                <!-- Chart 4: Volatilidad Diaria -->
                 <div class="bg-white rounded-lg shadow-sm border border-gray-200">
                     <div class="px-5 py-4 border-b border-gray-200">
                         <div class="flex items-center justify-between mb-2">
@@ -324,7 +342,7 @@
                     </div>
                 </div>
 
-                <!-- Chart 4: Distribución de Spread -->
+                <!-- Chart 5: Distribución de Spread -->
                 <div class="bg-white rounded-lg shadow-sm border border-gray-200">
                     <div class="px-5 py-4 border-b border-gray-200">
                         <div class="mb-2">
@@ -338,44 +356,6 @@
                         </div>
                         <div x-show="!loading && !error">
                             <div id="distributionChart" class="w-full" style="height: 320px;"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Chart 5: Evolución del Spread % con Bandas -->
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-                    <div class="px-5 py-4 border-b border-gray-200">
-                        <div class="flex items-center justify-between mb-2">
-                            <div>
-                                <h2 class="text-base font-bold text-gray-900">Spread % con Bandas Estadísticas</h2>
-                            </div>
-                            <div class="flex items-center gap-3 text-xs font-medium">
-                                <div class="flex items-center gap-1.5">
-                                    <div class="w-2 h-2 rounded-full bg-purple-600"></div>
-                                    <span class="text-gray-600">Spread</span>
-                                </div>
-                                <div class="flex items-center gap-1.5">
-                                    <div class="w-3 h-0.5 bg-amber-500 rounded-full"></div>
-                                    <span class="text-gray-600">Media</span>
-                                </div>
-                                <div class="flex items-center gap-1.5">
-                                    <div class="w-3 h-0.5 bg-emerald-600 rounded-full"></div>
-                                    <span class="text-gray-600">P75</span>
-                                </div>
-                                <div class="flex items-center gap-1.5">
-                                    <div class="w-3 h-0.5 bg-red-600 rounded-full"></div>
-                                    <span class="text-gray-600">P25</span>
-                                </div>
-                            </div>
-                        </div>
-                        <p class="text-xs text-gray-500 leading-relaxed">Área púrpura muestra la evolución del spread %. Líneas de referencia calculadas excluyendo datos de hoy: naranja (media histórica), verde (percentil 75 - spread bueno), roja (percentil 25 - spread bajo). Compara el spread actual contra el comportamiento normal del período anterior.</p>
-                    </div>
-                    <div class="p-5">
-                        <div x-show="loading" class="flex justify-center items-center" style="height: 320px;">
-                            <div class="w-10 h-10 border-4 border-gray-200 border-t-indigo-600 rounded-full animate-spin"></div>
-                        </div>
-                        <div x-show="!loading && !error">
-                            <div id="spreadBandsChart" class="w-full" style="height: 320px;"></div>
                         </div>
                     </div>
                 </div>
@@ -399,8 +379,7 @@
                     binanceRate: null,
                     spreadDual: null,
                     volatility: null,
-                    distribution: null,
-                    spreadBands: null
+                    distribution: null
                 },
                 stats: {
                     bcv: null,
@@ -710,10 +689,9 @@
                     this.renderSpreadDualChart(bcvFilled, binanceRates);
                     this.renderVolatilityChart(bcvFilled, binanceRates);
                     this.renderDistributionChart(bcvFilled, binanceRates);
-                    this.renderSpreadBandsChart(bcvFilled, binanceRates);
                 },
 
-                // Chart 1: Tasa BCV
+                // Chart 2: Tasa BCV
                 renderBcvRateChart(bcvFilled, binanceRates) {
                     const container = document.getElementById('bcvRateChart');
                     if (!container || bcvFilled.length === 0) return;
@@ -787,7 +765,7 @@
                     this.makeResponsive(container, this.charts.bcvRate);
                 },
 
-                // Chart 2: Tasa Binance
+                // Chart 3: Tasa Binance
                 renderBinanceRateChart(bcvFilled, binanceRates) {
                     const container = document.getElementById('binanceRateChart');
                     if (!container || binanceRates.length === 0) return;
@@ -815,6 +793,35 @@
                         priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
                     });
                     binanceSeries.setData(binanceData);
+
+                    // Tooltip functionality
+                    this.charts.binanceRate.subscribeCrosshairMove((param) => {
+                        const tooltip = document.getElementById('binanceTooltip');
+                        if (param.point && param.time) {
+                            const data = param.seriesData.get(binanceSeries);
+                            if (data) {
+                                const date = new Date(param.time * 1000);
+                                const formattedDate = date.toLocaleString('es-VE', {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                });
+                                tooltip.innerHTML = `Binance: ${data.value.toFixed(2)} Bs/USD<br>${formattedDate}`;
+                                tooltip.style.left = (param.point.x + 20) + 'px';
+                                tooltip.style.top = (param.point.y - 40) + 'px';
+                                tooltip.classList.remove('opacity-0');
+                                tooltip.classList.add('opacity-100');
+                            } else {
+                                tooltip.classList.remove('opacity-100');
+                                tooltip.classList.add('opacity-0');
+                            }
+                        } else {
+                            tooltip.classList.remove('opacity-100');
+                            tooltip.classList.add('opacity-0');
+                        }
+                    });
 
                     // Auto-escalado dinámico
                     binanceSeries.applyOptions({
@@ -861,14 +868,14 @@
                     this.makeResponsive(container, this.charts.binanceRate);
                 },
 
-                // Chart 2: Spread Dual (Bs + %)
+                // Chart 1: Spread Dual (Bs + %)
                 renderSpreadDualChart(bcvFilled, binanceRates) {
                     const container = document.getElementById('spreadDualChart');
                     if (!container || bcvFilled.length === 0 || binanceRates.length === 0) return;
 
                     this.charts.spreadDual = LightweightCharts.createChart(container, {
                         width: container.clientWidth,
-                        height: 320,
+                        height: 400,
                         layout: { background: { color: '#ffffff' }, textColor: '#333' },
                         grid: { vertLines: { color: '#f0f0f0' }, horzLines: { color: '#f0f0f0' } },
                         timeScale: { borderColor: '#cccccc', timeVisible: true, secondsVisible: false },
@@ -918,6 +925,84 @@
                         priceScaleId: 'left',
                     });
                     lineSeries.setData(spreadPercentData);
+
+                    // Líneas de bandas estadísticas
+                    if (this.stats.spreadStats && spreadPercentData.length > 0) {
+                        // Media
+                        const avgLine = this.charts.spreadDual.addLineSeries({
+                            color: '#f59e0b',
+                            lineWidth: 2,
+                            lineStyle: LightweightCharts.LineStyle.Solid,
+                            priceLineVisible: false,
+                            priceScaleId: 'left',
+                        });
+                        avgLine.setData(spreadPercentData.map(d => ({ time: d.time, value: this.stats.spreadStats.avg })));
+
+                        // P75
+                        const p75Line = this.charts.spreadDual.addLineSeries({
+                            color: '#10b981',
+                            lineWidth: 2,
+                            lineStyle: LightweightCharts.LineStyle.Solid,
+                            priceLineVisible: false,
+                            priceScaleId: 'left',
+                        });
+                        p75Line.setData(spreadPercentData.map(d => ({ time: d.time, value: this.stats.spreadStats.p75 })));
+
+                        // MIN
+                        const minLine = this.charts.spreadDual.addLineSeries({
+                            color: '#ef4444',
+                            lineWidth: 2,
+                            lineStyle: LightweightCharts.LineStyle.Solid,
+                            priceLineVisible: false,
+                            priceScaleId: 'left',
+                        });
+                        minLine.setData(spreadPercentData.map(d => ({ time: d.time, value: this.stats.spreadStats.min })));
+
+                        // MAX
+                        const maxLine = this.charts.spreadDual.addLineSeries({
+                            color: '#2563eb',
+                            lineWidth: 2,
+                            lineStyle: LightweightCharts.LineStyle.Solid,
+                            priceLineVisible: false,
+                            priceScaleId: 'left',
+                        });
+                        maxLine.setData(spreadPercentData.map(d => ({ time: d.time, value: this.stats.spreadStats.max })));
+                    }
+                    this.charts.spreadDual.subscribeCrosshairMove((param) => {
+                        const tooltip = document.getElementById('spreadDualTooltip');
+                        if (param.point && param.time) {
+                            const histData = param.seriesData.get(histogramSeries);
+                            const lineData = param.seriesData.get(lineSeries);
+                            if (histData || lineData) {
+                                const date = new Date(param.time * 1000);
+                                const formattedDate = date.toLocaleString('es-VE', {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                });
+                                let tooltipContent = `${formattedDate}<br>`;
+                                if (histData) {
+                                    tooltipContent += `Spread Bs: ${histData.value.toFixed(2)}<br>`;
+                                }
+                                if (lineData) {
+                                    tooltipContent += `Spread %: ${lineData.value.toFixed(2)}%`;
+                                }
+                                tooltip.innerHTML = tooltipContent;
+                                tooltip.style.left = (param.point.x - 150) + 'px';
+                                tooltip.style.top = (param.point.y - 25) + 'px';
+                                tooltip.classList.remove('opacity-0');
+                                tooltip.classList.add('opacity-100');
+                            } else {
+                                tooltip.classList.remove('opacity-100');
+                                tooltip.classList.add('opacity-0');
+                            }
+                        } else {
+                            tooltip.classList.remove('opacity-100');
+                            tooltip.classList.add('opacity-0');
+                        }
+                    });
 
                     // Habilitar auto-escalado dinámico para el histograma (Bs)
                     histogramSeries.applyOptions({
@@ -988,7 +1073,7 @@
                     this.makeResponsive(container, this.charts.spreadDual);
                 },
 
-                // Chart 3: Volatilidad (cambios diarios)
+                // Chart 4: Volatilidad (cambios diarios)
                 renderVolatilityChart(bcvFilled, binanceRates) {
                     const container = document.getElementById('volatilityChart');
                     if (!container) return;
@@ -1027,7 +1112,7 @@
                     this.makeResponsive(container, this.charts.volatility);
                 },
 
-                // Chart 4: Distribución de spread
+                // Chart 5: Distribución de spread
                 renderDistributionChart(bcvFilled, binanceRates) {
                     const container = document.getElementById('distributionChart');
                     if (!container || bcvFilled.length === 0 || binanceRates.length === 0) return;
@@ -1066,76 +1151,6 @@
                     histogramSeries.setData(histogramData);
 
                     this.makeResponsive(container, this.charts.distribution);
-                },
-
-                // Chart 5: Spread % con bandas estadísticas
-                renderSpreadBandsChart(bcvFilled, binanceRates) {
-                    const container = document.getElementById('spreadBandsChart');
-                    if (!container || bcvFilled.length === 0 || binanceRates.length === 0) return;
-
-                    this.charts.spreadBands = LightweightCharts.createChart(container, {
-                        width: container.clientWidth,
-                        height: 320,
-                        layout: { background: { color: '#ffffff' }, textColor: '#333' },
-                        grid: { vertLines: { color: '#f0f0f0' }, horzLines: { color: '#f0f0f0' } },
-                        timeScale: { borderColor: '#cccccc', timeVisible: true, secondsVisible: false },
-                        rightPriceScale: { borderColor: '#cccccc' },
-                    });
-
-                    const bcvMap = new Map(bcvFilled.map(r => [r.timestamp, parseFloat(r.rate)]));
-                    const spreadData = [];
-
-                    binanceRates.forEach(r => {
-                        const binanceRate = parseFloat(r.rate);
-                        const bcvRate = bcvMap.get(r.timestamp);
-                        if (!bcvRate || !binanceRate) return;
-
-                        const time = Math.floor(new Date(r.timestamp).getTime() / 1000);
-                        const spreadPercent = ((binanceRate - bcvRate) / binanceRate) * 100;
-                        spreadData.push({ time, value: spreadPercent });
-                    });
-
-                    // Serie principal de spread
-                    const spreadSeries = this.charts.spreadBands.addAreaSeries({
-                        topColor: 'rgba(147, 51, 234, 0.3)',
-                        bottomColor: 'rgba(147, 51, 234, 0.05)',
-                        lineColor: '#9333ea',
-                        lineWidth: 2,
-                        priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
-                    });
-                    spreadSeries.setData(spreadData);
-
-                    // Líneas de referencia
-                    if (this.stats.spreadStats && spreadData.length > 0) {
-                        // Media
-                        const avgLine = this.charts.spreadBands.addLineSeries({
-                            color: '#f59e0b',
-                            lineWidth: 2,
-                            lineStyle: LightweightCharts.LineStyle.Dashed,
-                            priceLineVisible: false,
-                        });
-                        avgLine.setData(spreadData.map(d => ({ time: d.time, value: this.stats.spreadStats.avg })));
-
-                        // P75
-                        const p75Line = this.charts.spreadBands.addLineSeries({
-                            color: '#10b981',
-                            lineWidth: 1.5,
-                            lineStyle: LightweightCharts.LineStyle.Dashed,
-                            priceLineVisible: false,
-                        });
-                        p75Line.setData(spreadData.map(d => ({ time: d.time, value: this.stats.spreadStats.p75 })));
-
-                        // P25
-                        const p25Line = this.charts.spreadBands.addLineSeries({
-                            color: '#ef4444',
-                            lineWidth: 1.5,
-                            lineStyle: LightweightCharts.LineStyle.Dashed,
-                            priceLineVisible: false,
-                        });
-                        p25Line.setData(spreadData.map(d => ({ time: d.time, value: this.stats.spreadStats.p25 })));
-                    }
-
-                    this.makeResponsive(container, this.charts.spreadBands);
                 },
 
                 // Funciones auxiliares
