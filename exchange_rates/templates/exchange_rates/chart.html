@@ -783,8 +783,15 @@
                         layout: { background: { color: '#ffffff' }, textColor: '#333' },
                         grid: { vertLines: { color: '#f0f0f0' }, horzLines: { color: '#f0f0f0' } },
                         timeScale: { borderColor: '#cccccc', timeVisible: true, secondsVisible: false },
-                        rightPriceScale: { borderColor: '#cccccc' },
-                        leftPriceScale: { visible: true, borderColor: '#9333ea' },
+                        rightPriceScale: {
+                            borderColor: '#cccccc',
+                            scaleMargins: { top: 0.1, bottom: 0.1 }
+                        },
+                        leftPriceScale: {
+                            visible: true,
+                            borderColor: '#9333ea',
+                            scaleMargins: { top: 0.1, bottom: 0.1 }
+                        },
                     });
 
                     const bcvMap = new Map(bcvFilled.map(r => [r.timestamp, parseFloat(r.rate)]));
@@ -822,6 +829,72 @@
                         priceScaleId: 'left',
                     });
                     lineSeries.setData(spreadPercentData);
+
+                    // Habilitar auto-escalado dinámico para el histograma (Bs)
+                    histogramSeries.applyOptions({
+                        autoscaleInfoProvider: () => {
+                            const timeScale = this.charts.spreadDual.timeScale();
+                            const visibleRange = timeScale.getVisibleLogicalRange();
+
+                            if (!visibleRange) {
+                                return null;
+                            }
+
+                            // Obtener solo los datos visibles usando índices lógicos
+                            const from = Math.max(0, Math.floor(visibleRange.from));
+                            const to = Math.min(spreadBsData.length - 1, Math.ceil(visibleRange.to));
+
+                            const visibleData = spreadBsData.slice(from, to + 1);
+
+                            if (visibleData.length > 0) {
+                                const values = visibleData.map(d => d.value);
+                                const minValue = Math.min(...values);
+                                const maxValue = Math.max(...values);
+
+                                return {
+                                    priceRange: {
+                                        minValue: minValue,
+                                        maxValue: maxValue,
+                                    },
+                                };
+                            }
+
+                            return null;
+                        },
+                    });
+
+                    // Habilitar auto-escalado dinámico para la línea (%)
+                    lineSeries.applyOptions({
+                        autoscaleInfoProvider: () => {
+                            const timeScale = this.charts.spreadDual.timeScale();
+                            const visibleRange = timeScale.getVisibleLogicalRange();
+
+                            if (!visibleRange) {
+                                return null;
+                            }
+
+                            // Obtener solo los datos visibles usando índices lógicos
+                            const from = Math.max(0, Math.floor(visibleRange.from));
+                            const to = Math.min(spreadPercentData.length - 1, Math.ceil(visibleRange.to));
+
+                            const visibleData = spreadPercentData.slice(from, to + 1);
+
+                            if (visibleData.length > 0) {
+                                const values = visibleData.map(d => d.value);
+                                const minValue = Math.min(...values);
+                                const maxValue = Math.max(...values);
+
+                                return {
+                                    priceRange: {
+                                        minValue: minValue,
+                                        maxValue: maxValue,
+                                    },
+                                };
+                            }
+
+                            return null;
+                        },
+                    });
 
                     this.makeResponsive(container, this.charts.spreadDual);
                 },
