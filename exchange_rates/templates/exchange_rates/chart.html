@@ -214,21 +214,17 @@
             <!-- Charts Grid -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-                <!-- Chart 1: Spread Dual (Bs + %) -->
+                <!-- Chart 1: Spread Porcentual -->
                 <div class="bg-white rounded-lg shadow-sm border border-gray-200 lg:col-span-2">
                     <div class="px-5 py-4 border-b border-gray-200">
                         <div class="flex items-center justify-between mb-2">
                             <div>
-                                <h2 class="text-base font-bold text-gray-900">Spread Absoluto y Relativo</h2>
+                                <h2 class="text-base font-bold text-gray-900">Spread Porcentual</h2>
                             </div>
                             <div class="flex items-center gap-3 text-xs font-medium">
                                 <div class="flex items-center gap-1.5">
-                                    <div class="w-3 h-2 bg-emerald-600 rounded"></div>
-                                    <span class="text-gray-600">Bs</span>
-                                </div>
-                                <div class="flex items-center gap-1.5">
                                     <div class="w-3 h-0.5 bg-purple-600 rounded-full"></div>
-                                    <span class="text-gray-600">%</span>
+                                    <span class="text-gray-600">Spread %</span>
                                 </div>
                                 <div class="flex items-center gap-1.5">
                                     <div class="w-3 h-0.5 bg-amber-500 rounded-full"></div>
@@ -248,7 +244,7 @@
                                 </div>
                             </div>
                         </div>
-                        <p class="text-xs text-gray-500 leading-relaxed">Histograma verde muestra el spread en Bs (eje derecho) y línea púrpura el spread en % (eje izquierdo). Líneas continuas muestran bandas estadísticas históricas: naranja (media), verde (percentil 75), roja (mínimo), azul (máximo). Dual scale para ver ambas métricas simultáneamente.</p>
+                        <p class="text-xs text-gray-500 leading-relaxed">Línea púrpura muestra el spread porcentual entre Binance y BCV. Líneas continuas muestran bandas estadísticas históricas: naranja (media), verde (percentil 75), roja (mínimo), azul (máximo).</p>
                     </div>
                     <div class="p-5">
                         <div x-show="loading" class="flex justify-center items-center" style="height: 400px;">
@@ -873,7 +869,7 @@
                     this.makeResponsive(container, this.charts.binanceRate);
                 },
 
-                // Chart 1: Spread Dual (Bs + %)
+                // Chart 1: Spread Porcentual
                 renderSpreadDualChart(bcvFilled, binanceRates) {
                     const container = document.getElementById('spreadDualChart');
                     if (!container || bcvFilled.length === 0 || binanceRates.length === 0) return;
@@ -885,11 +881,6 @@
                         grid: { vertLines: { color: '#f0f0f0' }, horzLines: { color: '#f0f0f0' } },
                         timeScale: { borderColor: '#cccccc', timeVisible: true, secondsVisible: false },
                         rightPriceScale: {
-                            borderColor: '#cccccc',
-                            scaleMargins: { top: 0.1, bottom: 0.1 }
-                        },
-                        leftPriceScale: {
-                            visible: true,
                             borderColor: '#9333ea',
                             scaleMargins: { top: 0.1, bottom: 0.1 }
                         },
@@ -897,8 +888,7 @@
 
                     const bcvMap = new Map(bcvFilled.map(r => [r.timestamp, parseFloat(r.rate)]));
 
-                    // Spread en Bs (histograma - escala derecha)
-                    const spreadBsData = [];
+                    // Spread en % (línea principal)
                     const spreadPercentData = [];
 
                     binanceRates.forEach(r => {
@@ -910,24 +900,14 @@
                         const spreadBs = binanceRate - bcvRate;
                         const spreadPercent = (spreadBs / binanceRate) * 100;
 
-                        spreadBsData.push({ time, value: spreadBs, color: '#10b981' });
                         spreadPercentData.push({ time, value: spreadPercent });
                     });
 
-                    // Histograma Bs (derecha)
-                    const histogramSeries = this.charts.spreadDual.addHistogramSeries({
-                        color: '#10b981',
-                        priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
-                        priceScaleId: 'right',
-                    });
-                    histogramSeries.setData(spreadBsData);
-
-                    // Línea % (izquierda)
+                    // Línea % (principal)
                     const lineSeries = this.charts.spreadDual.addLineSeries({
                         color: '#9333ea',
-                        lineWidth: 2,
+                        lineWidth: 2.5,
                         priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
-                        priceScaleId: 'left',
                     });
                     lineSeries.setData(spreadPercentData);
 
@@ -939,7 +919,6 @@
                             lineWidth: 2,
                             lineStyle: LightweightCharts.LineStyle.Solid,
                             priceLineVisible: false,
-                            priceScaleId: 'left',
                         });
                         avgLine.setData(spreadPercentData.map(d => ({ time: d.time, value: this.stats.spreadStats.avg })));
 
@@ -949,7 +928,6 @@
                             lineWidth: 2,
                             lineStyle: LightweightCharts.LineStyle.Solid,
                             priceLineVisible: false,
-                            priceScaleId: 'left',
                         });
                         p75Line.setData(spreadPercentData.map(d => ({ time: d.time, value: this.stats.spreadStats.p75 })));
 
@@ -959,7 +937,6 @@
                             lineWidth: 2,
                             lineStyle: LightweightCharts.LineStyle.Solid,
                             priceLineVisible: false,
-                            priceScaleId: 'left',
                         });
                         minLine.setData(spreadPercentData.map(d => ({ time: d.time, value: this.stats.spreadStats.min })));
 
@@ -969,16 +946,14 @@
                             lineWidth: 2,
                             lineStyle: LightweightCharts.LineStyle.Solid,
                             priceLineVisible: false,
-                            priceScaleId: 'left',
                         });
                         maxLine.setData(spreadPercentData.map(d => ({ time: d.time, value: this.stats.spreadStats.max })));
                     }
                     this.charts.spreadDual.subscribeCrosshairMove((param) => {
                         const tooltip = document.getElementById('spreadDualTooltip');
                         if (param.point && param.time) {
-                            const histData = param.seriesData.get(histogramSeries);
                             const lineData = param.seriesData.get(lineSeries);
-                            if (histData || lineData) {
+                            if (lineData) {
                                 const date = new Date(param.time * 1000);
                                 const formattedDate = date.toLocaleString('es-VE', {
                                     timeZone: 'America/Caracas',
@@ -988,16 +963,9 @@
                                     hour: '2-digit',
                                     minute: '2-digit'
                                 });
-                                let tooltipContent = `${formattedDate}<br>`;
-                                if (histData) {
-                                    tooltipContent += `Spread Bs: ${histData.value.toFixed(2)}<br>`;
-                                }
-                                if (lineData) {
-                                    tooltipContent += `Spread %: ${lineData.value.toFixed(2)}%`;
-                                }
-                                tooltip.innerHTML = tooltipContent;
-                                tooltip.style.left = (param.point.x - 150) + 'px';
-                                tooltip.style.top = (param.point.y - 25) + 'px';
+                                tooltip.innerHTML = `${formattedDate}<br>Spread: ${lineData.value.toFixed(2)}%`;
+                                tooltip.style.left = (param.point.x + 20) + 'px';
+                                tooltip.style.top = (param.point.y - 50) + 'px';
                                 tooltip.classList.remove('opacity-0');
                                 tooltip.classList.add('opacity-100');
                             } else {
@@ -1008,39 +976,6 @@
                             tooltip.classList.remove('opacity-100');
                             tooltip.classList.add('opacity-0');
                         }
-                    });
-
-                    // Habilitar auto-escalado dinámico para el histograma (Bs)
-                    histogramSeries.applyOptions({
-                        autoscaleInfoProvider: () => {
-                            const timeScale = this.charts.spreadDual.timeScale();
-                            const visibleRange = timeScale.getVisibleLogicalRange();
-
-                            if (!visibleRange) {
-                                return null;
-                            }
-
-                            // Obtener solo los datos visibles usando índices lógicos
-                            const from = Math.max(0, Math.floor(visibleRange.from));
-                            const to = Math.min(spreadBsData.length - 1, Math.ceil(visibleRange.to));
-
-                            const visibleData = spreadBsData.slice(from, to + 1);
-
-                            if (visibleData.length > 0) {
-                                const values = visibleData.map(d => d.value);
-                                const minValue = Math.min(...values);
-                                const maxValue = Math.max(...values);
-
-                                return {
-                                    priceRange: {
-                                        minValue: minValue,
-                                        maxValue: maxValue,
-                                    },
-                                };
-                            }
-
-                            return null;
-                        },
                     });
 
                     // Habilitar auto-escalado dinámico para la línea (%)
