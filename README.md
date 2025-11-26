@@ -1,500 +1,418 @@
 # Financial Helper 💰
 
-Sistema de gestión de compras personales y seguimiento de precios desarrollado en Django. Permite registrar y analizar compras detalladamente, realizar seguimiento de precios de productos, gestionar establecimientos comerciales y convertir montos entre VES y USD utilizando tasas de cambio del BCV y Binance.
+Sistema integral de gestión de compras personales y análisis de tasas de cambio desarrollado en Django. Diseñado para el mercado venezolano, combina tracking de gastos en VES/USD con monitoreo en tiempo real de tasas de cambio BCV y Binance P2P.
 
 ## 📋 Descripción
 
-Financial Helper es una aplicación web que ayuda a controlar gastos personales y hacer seguimiento de precios de productos en el tiempo. El sistema está diseñado para el mercado venezolano, pero puede adaptarse a otros contextos.
+Financial Helper es una plataforma web completa para:
+- **Control de gastos** con doble valoración (VES y USD según BCV/Binance)
+- **Monitoreo de tasas de cambio** con actualización automática y análisis estadístico
+- **Dashboard financiero interactivo** con gráficos en tiempo real
+- **Procesamiento OCR** de facturas con pipeline de 7 pasos
+- **Normalización de productos** con 900+ categorías jerárquicas
 
-### Características Principales
+### 🎯 Características Principales
 
-- 🛒 **Gestión de Compras**: Registro completo de compras con metadata del documento (tipo, número, fecha, hora)
-- 📦 **Control de Productos**: Sistema de productos con normalización de nombres, marcas, categorías y tipos de unidad
-- 🏪 **Gestión de Establecimientos**: Base de datos de comercios con información completa (razón social, RIF, dirección, etc.)
-- 💱 **Conversión de Monedas**: Almacenamiento de tasas BCV y Binance para cada compra, permitiendo análisis en VES y USD
-- 📊 **Categorización Inteligente**: Sistema jerárquico de categorías con más de 900 subcategorías predefinidas
-- 🔍 **Seguimiento de Precios**: Permite comparar precios de productos en el tiempo
-- 💳 **Información de Pago**: Registro de métodos de pago, referencias bancarias, tarjetas utilizadas
-- 📱 **Panel de Administración**: Interfaz completa de Django Admin para gestión de datos
-- 🐳 **Dockerizado**: Configuración lista para desarrollo y producción con Docker Compose
+**📊 Sistema de Tasas de Cambio (Exchange Rates)**
+- **Actualización automática**: Binance P2P cada 15 min, BCV cada hora
+- **Limpieza de outliers**: Método IQR (Interquartile Range) para precisión estadística
+- **Snapshots históricos**: Almacenamiento con timestamp exacto para análisis temporal
+- **Dashboard interactivo** con 5 gráficos:
+  - Spread porcentual con bandas estadísticas (MIN, AVG, P75, MAX)
+  - Tasa BCV oficial (área chart con zoom 7 días)
+  - Tasa Binance P2P (área chart con zoom 24 horas)
+  - Volatilidad diaria (histograma de cambios %)
+  - Distribución de spread (histograma de frecuencias)
+- **Calculadora bidireccional** BCV ↔ Binance en tiempo real
+- **API REST**: Consulta de tasas históricas con parámetros de fecha
+
+**🛒 Gestión de Compras**
+- **Doble valoración**: Cada compra se guarda en VES, USD-BCV y USD-Binance
+- **Snapshots de tasas**: Las tasas se congelan al momento de la compra (análisis histórico inmutable)
+- **Metadata completa**: Fecha, hora, tipo de documento, métodos de pago, impuestos
+- **Items detallados**: Cantidad, unidad, precio unitario en 3 monedas
+- **Admin inline**: Edición eficiente con todos los items en una pantalla
+
+**📦 Productos y Categorías**
+- **900+ categorías** predefinidas (Alimentos, Limpieza, Cuidado Personal, Tecnología, etc.)
+- **Sistema jerárquico** parent-child para organización flexible
+- **Marcas y variantes**: Talla, sabor, color, material, versión, empaque
+- **Normalización**: Mapeo de descripciones crudas a productos estandarizados
+- **API de filtrado**: Búsqueda por lista de categorías
+
+**🖼️ Procesamiento OCR de Facturas**
+- **Pipeline de 7 pasos**: Filtros, detección de documento, limpieza, contraste, umbralización
+- **3 algoritmos de detección**: Canny edges, Otsu threshold, análisis de brillo
+- **Preprocesamiento agresivo**: Mediana, bilateral, CLAHE, morfología
+- **Parámetros ajustables**: Página de tuning para optimización
+- **Salida flexible**: Base64 JSON o binario PNG
+
+**🏪 Establecimientos**
+- Información legal: RIF/NIT, razón social, nombre comercial
+- Ubicación completa: Dirección, ciudad, estado, código postal, país
+- Contacto: Teléfono, email, sitio web
+
+**🔐 Backup Automatizado**
+- **API endpoint**: `POST /api/backup/download/` con autenticación Bearer
+- **Compresión**: gzip nivel 9 (~100KB típico)
+- **Contenido completo**: DROP/CREATE + INSERT de todas las tablas
+- **Descarga directa**: Un comando curl genera backup con timestamp
 
 ## 🏗️ Arquitectura del Sistema
 
-### Modelos de Datos
+### 6 Aplicaciones Django
 
-#### Establishments (Establecimientos)
-Gestiona los comercios donde se realizan compras:
-- Información legal (nombre comercial, razón social, RIF/NIT)
-- Ubicación (dirección, ciudad, estado, código postal, país)
-- Contacto (teléfono, email, sitio web)
-- Timestamps de creación y actualización
+**1. exchange_rates/** - Sistema de tasas de cambio (⭐ Core)
+- **Modelo**: `ExchangeRate` (source, rate, date, timestamp, notes)
+- **Sources**: BCV, BINANCE_BUY, BINANCE_SELL
+- **Comandos**: `update_binance_rates`, `fetch_bcv_rate`
+- **API**: `GET /api/exchange-rates/bcv/?days=7&end_date=2025-11-25`
+- **Vista**: Dashboard interactivo con TradingView Lightweight Charts
+- **Métodos del modelo**: `get_rate()`, `convert_ves_to_usd()`, `get_latest_rates()`
 
-#### Products (Productos)
-Sistema de productos con normalización:
-- **ProductCategory**: Categorías jerárquicas (padre-hijo)
-- **Product**: Productos normalizados con:
-  - Nombre normalizado
-  - Marca (opcional)
-  - Categoría
-  - Tipo de unidad (kg, g, litros, ml, unidad)
-  - Restricción de unicidad por nombre + marca + tipo de unidad
+**2. purchases/** - Tracking de compras
+- **Purchase**: Compra completa con snapshots de tasas (bcv_rate, binance_rate)
+- **PurchaseItem**: Items individuales con precios en VES, USD-BCV, USD-Binance
+- **Admin**: TabularInline para edición eficiente
+- **Cálculos automáticos**: total_usd_bcv, total_usd_binance, unit_price_*
 
-#### Purchases (Compras)
-Registro completo de transacciones:
-- **Purchase**: Compra completa con:
-  - Usuario propietario
-  - Establecimiento
-  - Metadata del documento (tipo, número, fecha, hora)
-  - Totales en VES (subtotal, descuento, total, impuestos)
-  - Tasas de cambio (BCV y Binance) snapshot
-  - Totales calculados en USD
-  - Información fiscal (tipo de impuesto, porcentaje, base imponible)
-  - Datos de pago (método, referencia, banco, últimos 4 dígitos)
-  - Información adicional (cajero, vendedor, número de caja)
-  - JSON original de la compra
+**3. products/** - Catálogo normalizado
+- **ProductCategory**: Jerárquico con parent-child
+- **ProductBrand**: Marcas únicas
+- **Product**: Productos normalizados (nombre único)
+- **ProductVariant**: Variantes (size, flavor, color, material, version, package)
+- **ProductVariantAssignment**: Tabla M2M
+- **Comandos**: `populate_product_categories`, `populate_common_products`
+- **API**: `POST /api/products/by-categories/` (filtrado por categorías)
 
-- **PurchaseItem**: Items individuales de cada compra:
-  - Referencia al producto normalizado (opcional)
-  - Detalles del recibo (código, descripción, cantidad, unidad)
-  - Precios en VES (unitario, descuento, impuesto, subtotal)
-  - Precios calculados en USD (BCV y Binance)
-  - Precio normalizado por unidad estándar (para comparación)
+**4. image_processor/** - OCR de facturas
+- **Pipeline**: 7 pasos (preprocessing → detección → limpieza → contraste → threshold)
+- **Detección**: 3 algoritmos paralelos (Canny, Otsu, brillo)
+- **API**: `POST /api/process-invoice/`, `POST /api/process-with-params/`
+- **Tuning**: `/image-processor/tuning/` para ajuste de parámetros
 
-### Aplicaciones Django
+**5. establishments/** - Establecimientos comerciales
+- **Modelo**: `Establishment` (legal, ubicación, contacto)
+- FK opcional en Purchase
 
-```
-config/              # Configuración principal del proyecto
-├── settings.py      # Configuración de Django
-├── urls.py          # Rutas principales
-└── wsgi.py          # Punto de entrada WSGI
+**6. users/** - Sistema de usuarios
+- Extiende User estándar de Django
+- FK en Purchase (owner)
 
-establishments/      # App de establecimientos comerciales
-├── models.py        # Modelo Establishment
-├── admin.py         # Configuración del admin
-└── migrations/      # Migraciones de base de datos
+### Diseño Clave: Snapshots de Tasas
 
-products/           # App de productos y categorías
-├── models.py       # ProductCategory, Product
-├── admin.py        # Configuración del admin
-├── management/     # Comandos personalizados
-│   └── commands/
-│       └── populate_product_categories.py  # Poblar 900+ categorías
-└── migrations/
+```python
+# Cada Purchase guarda las tasas del momento
+purchase.bcv_rate = Decimal('50.12')
+purchase.binance_rate = Decimal('51.45')
 
-purchases/          # App de compras
-├── models.py       # Purchase, PurchaseItem
-├── admin.py        # Configuración del admin con inlines
-└── migrations/
+# Permite análisis histórico sin depender de tasas actuales
+purchase.total_usd_bcv = purchase.total_ves / purchase.bcv_rate
+purchase.total_usd_binance = purchase.total_ves / purchase.binance_rate
 ```
 
-## 🛠️ Tecnologías Utilizadas
-
-- **Backend**: Django 4.2+
-- **Base de Datos**: MySQL 8.0
-- **Servidor Web**: Gunicorn
-- **Archivos Estáticos**: WhiteNoise
-- **Contenedores**: Docker & Docker Compose
-- **Lenguaje**: Python 3.11
-
-### Dependencias Python
+### Relaciones de Base de Datos
 
 ```
-Django>=4.2,<5.0          # Framework web
-mysqlclient>=2.2.0        # Conector MySQL
-python-decouple>=3.8      # Manejo de variables de entorno
-gunicorn>=21.2.0          # Servidor WSGI
-whitenoise>=6.5.0         # Servir archivos estáticos
+User (Django auth)
+  └─> Purchase
+       ├─> Establishment (opcional FK)
+       ├─> bcv_rate, binance_rate (snapshots Decimal)
+       └─> PurchaseItem[]
+            └─> Product (opcional FK)
+                 ├─> ProductCategory (jerárquico)
+                 ├─> ProductBrand
+                 └─> ProductVariant[] (M2M)
+
+ExchangeRate (histórico)
+  └─> source (BCV/BINANCE_BUY/BINANCE_SELL)
+  └─> timestamp (único con source)
 ```
 
-## 🚀 Instalación y Configuración
+## 🛠️ Stack Tecnológico
 
-### Requisitos Previos
+**Backend**
+- Django 5.2.7 (Python 3.11)
+- MySQL 8.0 (charset: utf8mb4)
+- Gunicorn (WSGI server)
+- WhiteNoise (static files)
 
-- Docker
-- Docker Compose
-- Git (opcional)
+**Frontend**
+- Alpine.js 3.x (reactividad)
+- TailwindCSS (estilos)
+- TradingView Lightweight Charts (gráficos financieros)
 
-### Pasos de Instalación
+**Procesamiento**
+- OpenCV (cv2) - Detección y filtros de imagen
+- Pillow (PIL) - Manipulación de imágenes
+- NumPy - Operaciones matriciales
+- Playwright - Web scraping BCV (fallback)
+- BeautifulSoup4 - HTML parsing
 
-1. **Clonar o descargar el proyecto**
-```bash
-cd /ruta/al/proyecto
+**Infraestructura**
+- Docker & Docker Compose
+- python-decouple (env vars)
+
+**Dependencias clave**
+```txt
+Django==5.2.7
+mysqlclient>=2.2.0
+opencv-python>=4.8.0
+pillow>=10.0.0
+numpy>=1.24.0
+playwright>=1.40.0
+beautifulsoup4>=4.12.0
 ```
 
-2. **Configurar variables de entorno**
+## 🚀 Quick Start
+
+### 1. Configurar entorno
 ```bash
 cp .env.example .env
+# Editar .env si es necesario (valores por defecto OK para desarrollo)
 ```
 
-Editar `.env` según tus necesidades (los valores por defecto funcionan para desarrollo):
-```env
-# Django Settings
-SECRET_KEY=django-insecure-change-this-in-production
-DEBUG=True
-ALLOWED_HOSTS=localhost,127.0.0.1
-
-# Database Configuration
-DB_NAME=financial_helper
-DB_USER=django_user
-DB_PASSWORD=django_password
-DB_HOST=db
-DB_PORT=3306
-DB_ROOT_PASSWORD=root_password
-
-# Docker Ports
-WEB_PORT=8000
-```
-
-3. **Iniciar los servicios con Docker**
+### 2. Levantar servicios
 ```bash
 docker-compose up -d
+# Esperar ~30s para healthcheck de MySQL
 ```
 
-Esto iniciará:
-- Contenedor `financial_helper_db`: MySQL 8.0
-- Contenedor `financial_helper_web`: Django + Gunicorn
-
-4. **Esperar a que la base de datos esté lista**
-
-El servicio web tiene un healthcheck y esperará automáticamente a que MySQL esté disponible.
-
-5. **Las migraciones se ejecutan automáticamente** al iniciar el contenedor web
-
-6. **Crear un superusuario**
+### 3. Crear superusuario
 ```bash
 docker-compose exec web python manage.py createsuperuser
 ```
 
-7. **Poblar categorías de productos (opcional pero recomendado)**
+### 4. Poblar categorías (opcional)
 ```bash
 docker-compose exec web python manage.py populate_product_categories
+# Crea 900+ categorías en ~2 segundos
 ```
 
-Este comando crea 900+ categorías organizadas jerárquicamente:
-- Alimentos y Bebidas
-- Limpieza y Hogar
-- Cuidado Personal
-- Farmacia y Salud
-- Mascotas
-- Tecnología y Electrónica
-- Ropa y Calzado
-- Hogar y Decoración
-- Deportes y Fitness
-- Papelería y Oficina
-- Ferretería y Construcción
-- Automotriz
-- Bebés y Niños
-- Libros y Medios
-- Juguetes y Entretenimiento
-- Jardinería
-- Otros
+### 5. Acceder
+- **Dashboard**: http://localhost:8000
+- **Admin**: http://localhost:8000/admin
+- **Tuning OCR**: http://localhost:8000/image-processor/tuning/
 
 ## 📱 Uso del Sistema
 
-### Acceso a la Aplicación
+### Dashboard de Tasas de Cambio (/)
 
-- **Home (API Info)**: http://localhost:8000
-- **Panel de Administración**: http://localhost:8000/admin
-- **Base de Datos MySQL**: localhost:3306
+**Métricas en tiempo real**:
+- Tasa BCV actual y Binance P2P
+- Calculadora bidireccional (conversión BCV ↔ Binance)
+- Indicador de spread con bandas históricas
 
-### Panel de Administración
+**5 Gráficos interactivos** (TradingView Lightweight Charts):
+1. **Spread Porcentual**: Línea púrpura + bandas (MIN/AVG/P75/MAX)
+2. **Tasa BCV**: Área azul (zoom 7 días)
+3. **Tasa Binance P2P**: Área naranja (zoom 24 horas)
+4. **Volatilidad**: Histograma verde/rojo de cambios diarios
+5. **Distribución**: Histograma de frecuencia de spreads
 
-El sistema utiliza el Django Admin para gestión de datos. Accede con el superusuario creado:
+**Funcionalidades**:
+- Auto-refresh cada 5 minutos
+- Tooltips interactivos con timestamp
+- Zoom y navegación en gráficos
+- Cálculos estadísticos en cliente (percentiles, IQR)
 
-1. **Establecimientos**: Gestiona comercios y tiendas
-   - Filtros por país, estado, ciudad
-   - Búsqueda por nombre, razón social, RIF, email
+### Panel de Administración (/admin)
 
-2. **Categorías de Productos**: Organiza productos en categorías jerárquicas
-   - Filtros por categoría padre
-   - Búsqueda por nombre y descripción
+**Compras** (vista principal):
+- Inline editing de PurchaseItems (todos los items en una pantalla)
+- Filtros: fecha, usuario, establecimiento, método de pago
+- Muestra totales en VES, USD-BCV y USD-Binance
 
-3. **Productos**: Catálogo de productos normalizados
-   - Filtros por categoría, tipo de unidad, marca
-   - Búsqueda por nombre, marca, descripción
-   - Unicidad por nombre + marca + unidad
+**Productos**:
+- Gestión de categorías jerárquicas
+- Marcas y variantes (talla, sabor, color, etc.)
+- Normalización de descripciones crudas
 
-4. **Compras**: Registro de transacciones completas
-   - Visualización inline de items
-   - Filtros por fecha, usuario, establecimiento, tipo de documento, método de pago
-   - Búsqueda por usuario, establecimiento, número de documento
-   - Vista detallada con todos los items
+**Establecimientos**:
+- CRUD básico con filtros geográficos
+- Información legal y contacto
 
-5. **Items de Compra**: Productos individuales de cada compra
-   - Filtros por tipo de unidad, producto
-   - Búsqueda por descripción, código, usuario
+**Tasas de Cambio** (ExchangeRate):
+- Historial completo con timestamp
+- Filtros por source (BCV/BINANCE_BUY/BINANCE_SELL)
+- Solo lectura (se actualiza con comandos)
 
-## 🐳 Comandos Docker
+## 🔧 Comandos Principales
 
-### Gestión de Contenedores
+### Tasas de Cambio (recomendado automatizar con cron)
 
 ```bash
-# Iniciar servicios
-docker-compose up -d
+# Actualizar Binance P2P (cada 15 minutos recomendado)
+docker-compose exec web python manage.py update_binance_rates
 
-# Ver logs en tiempo real
-docker-compose logs -f
-
-# Ver logs solo del servicio web
-docker-compose logs -f web
-
-# Ver logs solo de la base de datos
-docker-compose logs -f db
-
-# Detener servicios
-docker-compose down
-
-# Detener y eliminar volúmenes (⚠️ elimina la base de datos)
-docker-compose down -v
-
-# Reiniciar servicios
-docker-compose restart
-
-# Reconstruir imágenes
-docker-compose build --no-cache
+# Actualizar BCV (cada hora recomendado)
+docker-compose exec web python manage.py fetch_bcv_rate
+docker-compose exec web python manage.py fetch_bcv_rate --force  # Forzar guardado
+docker-compose exec web python manage.py fetch_bcv_rate --test-rate 50.12  # Testing
 ```
 
-### Comandos de Django
+### Productos
 
 ```bash
-# Ejecutar migraciones
-docker-compose exec web python manage.py migrate
-
-# Crear migraciones
-docker-compose exec web python manage.py makemigrations
-
-# Crear superusuario
-docker-compose exec web python manage.py createsuperuser
-
-# Poblar categorías de productos
+# Poblar 900+ categorías (una vez)
 docker-compose exec web python manage.py populate_product_categories
 
-# Abrir shell de Django
-docker-compose exec web python manage.py shell
+# Poblar productos comunes (opcional)
+docker-compose exec web python manage.py populate_common_products
 
-# Ejecutar tests
-docker-compose exec web python manage.py test
+# Productos de prueba
+docker-compose exec web python manage.py populate_test_products
 
-# Collectstatic (ya se ejecuta automáticamente)
-docker-compose exec web python manage.py collectstatic --noinput
-
-# Ver comandos disponibles
-docker-compose exec web python manage.py help
+# Limpiar productos
+docker-compose exec web python manage.py delete_all_products
 ```
 
-### Comandos de Base de Datos
+### Backup y Restauración
 
 ```bash
-# Acceder a MySQL CLI
-docker-compose exec db mysql -u django_user -p financial_helper
-# Password: django_password (o el que hayas configurado)
+# Backup via API (recomendado)
+curl -X POST "http://localhost:8000/api/backup/download/" \
+  -H "Authorization: Bearer financial-helper-backup-secret-2024" \
+  --output backup_$(date +%Y%m%d_%H%M%S).sql.gz
 
-# Acceder como root
-docker-compose exec db mysql -u root -p
-# Password: root_password (o el que hayas configurado)
+# Producción
+curl -X POST "https://financial-helper.andresjosehr.com/api/backup/download/" \
+  -H "Authorization: Bearer financial-helper-backup-secret-2024" \
+  --output backup.sql.gz
 
-# Backup de base de datos
-docker-compose exec db mysqldump -u root -p financial_helper > backup.sql
+# Restaurar
+gunzip -c backup.sql.gz | docker-compose exec -T db mysql -u root -p financial_helper
+```
 
-# Restaurar base de datos
-docker-compose exec -T db mysql -u root -p financial_helper < backup.sql
+### Django Básico
+
+```bash
+docker-compose exec web python manage.py migrate
+docker-compose exec web python manage.py makemigrations
+docker-compose exec web python manage.py createsuperuser
+docker-compose exec web python manage.py shell
+docker-compose exec web python manage.py test
+```
+
+### Docker
+
+```bash
+docker-compose up -d          # Iniciar
+docker-compose logs -f web    # Ver logs
+docker-compose down           # Detener
+docker-compose restart        # Reiniciar
 ```
 
 ## 📁 Estructura del Proyecto
 
 ```
 financial-helper/
-├── config/                      # Configuración de Django
-│   ├── __init__.py
-│   ├── settings.py             # Configuración principal
-│   ├── urls.py                 # Rutas URL
-│   └── wsgi.py                 # Configuración WSGI
+├── config/                    # Configuración Django
+│   ├── settings.py           # Django settings + env vars
+│   ├── urls.py               # Rutas principales
+│   └── backup_views.py       # Endpoint de backup
 │
-├── establishments/             # App de establecimientos
-│   ├── migrations/
-│   ├── __init__.py
-│   ├── admin.py               # Admin de establecimientos
-│   ├── apps.py
-│   ├── models.py              # Modelo Establishment
-│   ├── tests.py
-│   └── views.py
+├── exchange_rates/           # ⭐ Sistema de tasas de cambio
+│   ├── models.py             # ExchangeRate (BCV/BINANCE)
+│   ├── views.py              # API + Dashboard
+│   ├── management/commands/
+│   │   ├── update_binance_rates.py  # Actualización automática
+│   │   └── fetch_bcv_rate.py        # Scraping BCV
+│   └── templates/exchange_rates/
+│       └── chart.html        # Dashboard con 5 gráficos
 │
-├── products/                   # App de productos
-│   ├── management/
-│   │   └── commands/
-│   │       └── populate_product_categories.py
-│   ├── migrations/
-│   ├── __init__.py
-│   ├── admin.py               # Admin de productos y categorías
-│   ├── apps.py
-│   ├── models.py              # ProductCategory, Product
-│   ├── tests.py
-│   └── views.py
+├── purchases/                # Tracking de compras
+│   ├── models.py             # Purchase (con snapshots), PurchaseItem
+│   └── admin.py              # Inline editing
 │
-├── purchases/                  # App de compras
-│   ├── migrations/
-│   ├── __init__.py
-│   ├── admin.py               # Admin de compras con inlines
-│   ├── apps.py
-│   ├── models.py              # Purchase, PurchaseItem
-│   ├── tests.py
-│   └── views.py
+├── products/                 # Catálogo normalizado
+│   ├── models.py             # Category, Brand, Product, Variant
+│   ├── views.py              # API de filtrado
+│   └── management/commands/
+│       ├── populate_product_categories.py  # 900+ categorías
+│       └── populate_common_products.py
 │
-├── staticfiles/               # Archivos estáticos (generados)
-│   └── admin/
+├── image_processor/          # OCR de facturas
+│   ├── views.py              # Pipeline de 7 pasos
+│   └── templates/            # test.html, tuning.html
 │
-├── apache/                    # Configuración Apache (si aplica)
-├── venv/                      # Entorno virtual Python (local)
+├── establishments/           # Establecimientos
+│   └── models.py             # Establishment
 │
-├── .env                       # Variables de entorno (no en repo)
-├── .env.example              # Plantilla de variables de entorno
-├── .gitignore                # Archivos ignorados por Git
-├── docker-compose.yml        # Orquestación de contenedores
-├── Dockerfile                # Imagen Docker de Django
-├── manage.py                 # CLI de Django
-├── requirements.txt          # Dependencias Python
-├── sql.sql                   # Script SQL de referencia
-├── image.png                 # Imagen del proyecto
-├── financial-helper.andresjosehr.com.conf  # Config Nginx/Apache
+├── users/                    # Usuarios (estructura vacía)
+│
+├── docker-compose.yml        # Orquestación (web + db)
+├── Dockerfile                # Python 3.11 + deps
+├── requirements.txt          # Django, OpenCV, Playwright, etc.
+├── .env.example              # Variables de entorno
 └── README.md                 # Este archivo
 ```
 
-## 🔒 Consideraciones de Seguridad
+## 🔧 API Endpoints
 
-### Para Desarrollo
+| Endpoint | Método | Descripción |
+|----------|--------|-------------|
+| `/` | GET | Dashboard principal (gráficos tasas) |
+| `/admin/` | GET | Panel de administración Django |
+| `/api/status/` | GET | Status del API (JSON) |
+| `/api/exchange-rates/bcv/` | GET/POST | Tasas BCV y Binance históricos |
+| `/api/products/by-categories/` | POST | Filtrar productos por categorías |
+| `/api/process-invoice/` | POST | Procesar factura (OCR óptimo) |
+| `/api/process-with-params/` | POST | Procesar factura (params custom) |
+| `/api/backup/download/` | POST | Descargar backup MySQL (.sql.gz) |
+| `/image-processor/test/` | GET | Página de prueba OCR |
+| `/image-processor/tuning/` | GET | Ajuste de parámetros OCR |
 
-Los valores por defecto en `.env.example` son seguros para desarrollo local.
+**Ejemplo**: Obtener tasas de los últimos 30 días
+```bash
+curl "http://localhost:8000/api/exchange-rates/bcv/?days=30&end_date=2025-11-25"
+```
 
-### Para Producción
+**Respuesta**:
+```json
+{
+  "start_date": "2025-10-26",
+  "end_date": "2025-11-25",
+  "days": 30,
+  "bcv": [{"date": "2025-11-25", "rate": 50.12}],
+  "binance_sell": [{"timestamp": "2025-11-25T14:30:00Z", "rate": 51.45}]
+}
+```
 
-⚠️ **IMPORTANTE**: Antes de desplegar en producción:
+## 🔒 Producción
 
-1. **Cambiar `SECRET_KEY`**:
-   ```python
-   # Generar una nueva con:
-   python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'
-   ```
+⚠️ **Antes de desplegar**:
 
-2. **Configurar `DEBUG=False`**:
-   ```env
-   DEBUG=False
-   ```
+```env
+# .env producción
+SECRET_KEY=<generar-con-get_random_secret_key>
+DEBUG=False
+ALLOWED_HOSTS=tudominio.com,www.tudominio.com
+DB_PASSWORD=<contraseña-fuerte-aleatoria>
 
-3. **Actualizar `ALLOWED_HOSTS`**:
-   ```env
-   ALLOWED_HOSTS=tudominio.com,www.tudominio.com
-   ```
+# Cambiar token de backup en config/backup_views.py
+HARDCODED_TOKEN = '<nuevo-token-seguro>'
+```
 
-4. **Cambiar contraseñas de base de datos**:
-   ```env
-   DB_PASSWORD=contraseña_segura_aleatoria
-   DB_ROOT_PASSWORD=otra_contraseña_segura
-   ```
+**Automatización de tasas** (crontab del servidor):
+```cron
+*/15 * * * * docker-compose exec -T web python manage.py update_binance_rates
+0 * * * * docker-compose exec -T web python manage.py fetch_bcv_rate
+```
 
-5. **Configurar HTTPS** (usar Nginx como proxy reverso)
+## 🎯 Casos de Uso
 
-6. **Implementar backups automáticos** de la base de datos
-
-7. **Limitar acceso al panel de administración** por IP si es posible
-
-## 🗄️ Esquema de Base de Datos
-
-El proyecto incluye un archivo `sql.sql` con la definición completa del esquema en SQL puro (para referencia). Las tablas se crean automáticamente mediante las migraciones de Django.
-
-### Tablas Principales
-
-- `establishments` - Establecimientos comerciales
-- `product_categories` - Categorías de productos (jerárquicas)
-- `products` - Productos normalizados
-- `purchases` - Compras completas
-- `purchase_items` - Items individuales de compras
-- `auth_user` - Usuarios (tabla de Django)
-
-### Índices Optimizados
-
-El sistema incluye índices para optimizar consultas frecuentes:
-- Búsqueda de establecimientos por nombre
-- Búsqueda de productos por nombre y categoría
-- Filtrado de compras por usuario y fecha
-- Relaciones entre items y productos
-
-## 🔄 Flujo de Trabajo Típico
-
-1. **Usuario registra un establecimiento** (o lo selecciona si ya existe)
-2. **Usuario crea una compra** con información del recibo:
-   - Fecha, hora, tipo de documento
-   - Totales en VES
-   - Tasas de cambio actuales (BCV/Binance)
-   - Método de pago
-3. **Para cada item del recibo**:
-   - Se registra la descripción original
-   - Opcionalmente se vincula a un producto normalizado
-   - Se calculan automáticamente precios en USD
-   - Se normalizan precios por unidad
-4. **El sistema almacena**:
-   - Datos originales del recibo
-   - Snapshot de tasas de cambio
-   - Conversiones calculadas
-5. **Permite análisis posterior**:
-   - Evolución de precios en el tiempo
-   - Comparación entre establecimientos
-   - Análisis en VES y USD
-   - Reportes de gastos
-
-## 🌐 API y Extensibilidad
-
-Actualmente el sistema usa Django Admin como interfaz. Para extender con una API REST:
-
-1. Instalar Django REST Framework:
-   ```bash
-   pip install djangorestframework
-   ```
-
-2. Crear serializers y viewsets para cada modelo
-
-3. Configurar rutas en `urls.py`
-
-4. Habilitar autenticación con tokens o JWT
-
-## 📊 Casos de Uso
-
-- **Control de Gastos Personal**: Registro detallado de compras del hogar
-- **Comparación de Precios**: Seguimiento de precios de productos en diferentes establecimientos
-- **Análisis de Inflación**: Seguimiento de variación de precios en el tiempo
-- **Control Presupuestario**: Análisis de gastos por categoría
-- **Planificación de Compras**: Identificación de mejores momentos y lugares para comprar
-- **Análisis en Dólares**: Evaluación del poder adquisitivo considerando el tipo de cambio
-
-## 🤝 Contribuciones
-
-Para contribuir al proyecto:
-
-1. Fork el repositorio
-2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abre un Pull Request
-
-## 📝 Licencia
-
-Este proyecto es de uso personal. Consulta con el autor para usos comerciales.
+- **Trading de divisas**: Dashboard en tiempo real con bandas estadísticas para identificar oportunidades
+- **Control de gastos**: Doble valoración (VES oficial vs mercado) para análisis real del poder adquisitivo
+- **Análisis de inflación**: Comparación de precios históricos en USD estable
+- **Procesamiento de facturas**: OCR automático con ajuste fino de parámetros
+- **Gestión de inventario**: Normalización de productos con categorías jerárquicas
 
 ## 👤 Autor
 
 **Andrés José Hernández**
-- Website: financial-helper.andresjosehr.com
+🌐 [financial-helper.andresjosehr.com](https://financial-helper.andresjosehr.com)
 
-## 🐛 Reporte de Errores
+## 📝 Licencia
 
-Si encuentras algún error o tienes sugerencias, por favor:
-1. Verifica los logs: `docker-compose logs -f web`
-2. Revisa la configuración en `.env`
-3. Consulta la documentación de Django: https://docs.djangoproject.com/
-
-## 📞 Soporte
-
-Para preguntas o soporte técnico, contacta al administrador del sistema.
-
----
-
-**¡Gracias por usar Financial Helper!** 💰✨
+Uso personal. Contactar al autor para uso comercial.

@@ -1,335 +1,344 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides technical guidance for Claude Code when working with this repository.
 
 ## Project Overview
 
-Financial Helper is a Django-based personal expense tracking system designed for the Venezuelan market. It tracks purchases with detailed metadata including VES/USD conversions using BCV and Binance exchange rates, product categorization, and establishment management.
+**Financial Helper** is a Django 5.2.7 system with 6 apps combining:
+- **Exchange rate tracking** (BCV + Binance P2P) with real-time updates and statistical analysis
+- **Expense tracking** with immutable exchange rate snapshots (VES, USD-BCV, USD-Binance)
+- **Interactive dashboard** with 5 TradingView charts (spread analysis, volatility, distribution)
+- **OCR invoice processing** with 7-step pipeline and 3 detection algorithms
+- **Product normalization** with 900+ hierarchical categories
 
-## Development Environment
+**Core feature**: Each purchase stores bcv_rate and binance_rate snapshots → immutable historical analysis in USD.
 
-The project runs entirely in Docker containers:
+## Docker Environment
 
-```bash
-# Start services (runs migrations & collectstatic automatically)
-docker-compose up -d
-
-# View logs
-docker-compose logs -f web
-
-# Stop services
-docker-compose down
-```
-
-## Common Commands
-
-### Django Management
-
-All Django commands must be run inside the Docker container:
+**All commands must run inside containers**:
 
 ```bash
-# Run migrations
-docker-compose exec web python manage.py migrate
+# Quick start
+docker-compose up -d                                    # Start (auto-migrate + collectstatic)
+docker-compose logs -f web                              # View logs
+docker-compose down                                     # Stop
 
-# Create migrations after model changes
-docker-compose exec web python manage.py makemigrations
+# Common Django commands (prefix all with: docker-compose exec web python manage.py)
+createsuperuser                                         # Create admin user
+populate_product_categories                             # 900+ categories (~2s)
+migrate / makemigrations                                # DB migrations
+shell                                                   # Django shell
+test [app_name]                                         # Run tests
 
-# Create superuser for admin panel
-docker-compose exec web python manage.py createsuperuser
+# Exchange rates (automate with cron: */15 for Binance, hourly for BCV)
+update_binance_rates                                    # Binance P2P (IQR outlier removal)
+fetch_bcv_rate [--force] [--test-rate 50.12]          # BCV scraping (BeautifulSoup + Playwright)
 
-# Populate product categories (900+ predefined categories)
-docker-compose exec web python manage.py populate_product_categories
-
-# Django shell
-docker-compose exec web python manage.py shell
-
-# Run tests
-docker-compose exec web python manage.py test
-
-# Run tests for specific app
-docker-compose exec web python manage.py test establishments
-docker-compose exec web python manage.py test products
-docker-compose exec web python manage.py test purchases
-
-# Update Binance P2P exchange rates (real-time, ~100 USD equivalent)
-docker-compose exec web python manage.py update_binance_rates
-
-# Fetch historical Binance rates from external API
-docker-compose exec web python manage.py fetch_binance_rates --date 2025-11-02
-
-# Import BCV rates from bcv.json file
-docker-compose exec web python manage.py import_bcv_rates
-```
-
-### Database Access
-
-```bash
-# MySQL CLI access
-docker-compose exec db mysql -u django_user -p financial_helper
-# Password: django_password (or from .env)
-
-# Database backup (manual via shell)
-docker-compose exec db mysqldump -u root -p financial_helper > backup.sql
-
-# Database backup (via API endpoint - recommended)
-curl -X POST "http://localhost:8000/api/backup/download/" \
+# Database
+docker-compose exec db mysql -u django_user -p financial_helper   # MySQL CLI (pass: from .env)
+curl -X POST "http://localhost:8000/api/backup/download/" \       # Backup API
   -H "Authorization: Bearer financial-helper-backup-secret-2024" \
-  --output backup_$(date +%Y%m%d_%H%M%S).sql.gz
-
-# Production backup
-curl -X POST "https://financial-helper.andresjosehr.com/api/backup/download/" \
-  -H "Authorization: Bearer financial-helper-backup-secret-2024" \
-  --output backup_$(date +%Y%m%d_%H%M%S).sql.gz
-
-# Database restore
-docker-compose exec -T db mysql -u root -p financial_helper < backup.sql
-
-# Restore from compressed backup
-gunzip -c backup.sql.gz | docker-compose exec -T db mysql -u root -p financial_helper
+  --output backup.sql.gz
+gunzip -c backup.sql.gz | docker-compose exec -T db mysql -u root -p financial_helper  # Restore
 ```
 
-### Development Workflow
+## Architecture (6 Django Apps)
 
-```bash
-# Rebuild containers after Dockerfile or requirements.txt changes
-docker-compose build --no-cache
+### 1. exchange_rates/ ⭐ (Core System)
 
-# Restart services
-docker-compose restart
+**Model**: `ExchangeRate`
+- Fields: `id` (UUID), `source` (BCV/BINANCE_BUY/BINANCE_SELL), `rate` (Decimal 12,4), `date`, `timestamp`, `notes`
+- Indexes: `source+timestamp` (unique), `source+date`, `timestamp DESC`, `date DESC`
+- Methods: `get_rate()`, `get_rate_value()`, `get_latest_rates()`, `convert_ves_to_usd()`, `convert_usd_to_ves()`
 
-# View container status
-docker-compose ps
+**update_binance_rates.py** (management command):
+1. Reference query → get best BUY/SELL rates → calculate ~100 USD in VES
+2. Filtered query with `transAmount` in VES → 20 BUY + 20 SELL offers
+3. **IQR outlier removal**: Q1, Q3, IQR = Q3-Q1, remove outside [Q1-1.5×IQR, Q3+1.5×IQR]
+4. Average clean prices → save with timestamp + outlier count in notes
+5. API: `https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search`
+
+**fetch_bcv_rate.py** (management command):
+- **Strategy 1**: requests + BeautifulSoup (fast, fails if JS required)
+- **Strategy 2**: Playwright headless browser (slow, reliable)
+- Validates: rate changed + range 50-500 Bs/USD
+- Flags: `--force` (force save), `--test-rate X.XX` (testing)
+
+**API**: `GET/POST /api/exchange-rates/bcv/?days=7&end_date=2025-11-25`
+- Returns: `{start_date, end_date, days, bcv: [{date, rate}], binance_sell: [{timestamp, rate}]}`
+
+**Dashboard** (`templates/exchange_rates/chart.html`):
+- **Tech**: Alpine.js + TailwindCSS + TradingView Lightweight Charts
+- **5 charts**:
+  1. Spread % (purple line + MIN/AVG/P75/MAX bands)
+  2. BCV rate (blue area, zoom 7d)
+  3. Binance P2P (orange area, zoom 24h)
+  4. Volatility (green/red histogram of daily changes)
+  5. Distribution (20-bin frequency histogram)
+- **Spread indicator**: Visual bar (red→amber→lime→green) with current position
+- **Bidirectional calculator**: BCV ↔ Binance conversion
+- **Auto-refresh**: 5 min interval
+- **Stats**: Client-side percentile calculation (P25, P50, P75), excludes today for historical bands
+
+### 2. purchases/
+
+**Models**:
+- `Purchase`: user (FK), establishment (FK optional), purchase_date, purchase_time, **bcv_rate** (Decimal snapshot), **binance_rate** (Decimal snapshot), total_ves, total_usd_bcv (calculated), total_usd_binance (calculated), tax_type, tax_percentage, raw_json
+- `PurchaseItem`: purchase (FK), product (FK optional), description, quantity, unit_type, total_ves, total_usd_bcv (calculated), total_usd_binance (calculated)
+- **Properties**: `unit_price_ves`, `unit_price_usd_bcv`, `unit_price_usd_binance`
+
+**Admin**: `PurchaseAdmin` with `PurchaseItemInline` (TabularInline) for efficient editing
+
+### 3. products/
+
+**Models**:
+- `ProductCategory`: name, description, parent (FK self, optional) → hierarchical
+- `ProductBrand`: name (unique)
+- `Product`: name (unique), category (FK optional), brand (FK optional)
+- `ProductVariant`: variant_type (size/flavor/color/material/version/package), value
+- `ProductVariantAssignment`: product (FK), variant (FK) → M2M
+
+**Commands**: `populate_product_categories`, `populate_common_products`, `populate_test_products`, `delete_all_products`
+
+**API**: `POST /api/products/by-categories/`
+- Request: `{"categories": ["Bebidas", "Lácteos"]}`
+- Response: Products with brands and variants
+
+### 4. image_processor/
+
+**Pipeline** (7 steps in `process_invoice_optimal`):
+1. Aggressive preprocessing: median(5×5), bilateral, morphology closing, CLAHE
+2. Invoice detection: 3 parallel strategies (Canny, Otsu, brightness) → select best by area
+3. Grayscale conversion
+4. Noise cleaning: median(5×5), gaussian(3×3), bilateral(9×9)
+5. Contrast boost: CLAHE aggressive (clipLimit=4.0), sharpening (1.5×)
+6. Adaptive thresholding: GAUSSIAN_C, window 31×31, offset +15
+7. Morphological cleanup: opening, closing, median(3×3)
+
+**APIs**:
+- `POST /api/process-invoice/` → optimal params, returns base64/binary PNG
+- `POST /api/process-with-params/` → custom params (median_blur, clahe_clip, etc.)
+
+**Tuning page**: `/image-processor/tuning/` for real-time parameter adjustment
+
+**Libraries**: OpenCV (cv2), Pillow, NumPy, SciPy
+
+### 5. establishments/
+
+**Model**: `Establishment` - name, legal_name, tax_id (RIF/NIT), address, city, state, postal_code, country, phone, email, website
+
+### 6. users/
+
+Empty structure extending Django User (FK in Purchase)
+
+## Key Design Patterns
+
+**1. Immutable Exchange Rate Snapshots**
+```python
+# Purchase model stores rates at purchase time
+purchase.bcv_rate = Decimal('50.12')           # Frozen snapshot
+purchase.binance_rate = Decimal('51.45')       # Frozen snapshot
+purchase.total_usd_bcv = total_ves / bcv_rate  # Calculated once
+# → Historical USD values never change, even if rates update
 ```
 
-## Architecture
+**2. UUID Primary Keys** - All models use UUIDs (not auto-increment)
 
-### Four Main Django Apps
+**3. Two-tier Product Tracking**
+- `PurchaseItem.description` (always stored) → raw receipt text
+- `PurchaseItem.product` (optional FK) → normalized for aggregation
 
-1. **establishments/** - Commercial establishments/stores
-   - Single model: `Establishment` with legal info, location, contact details
-   - Used as foreign key in purchases
-
-2. **products/** - Product catalog with hierarchical categorization
-   - `ProductCategory`: Hierarchical (parent-child) categories
-   - `Product`: Normalized products (name + brand + unit_type uniqueness)
-   - Includes management command to populate 900+ predefined categories
-
-3. **purchases/** - Purchase tracking with detailed breakdowns
-   - `Purchase`: Complete transaction with document metadata, VES/USD totals, payment info
-   - `PurchaseItem`: Individual line items with price tracking
-   - Stores exchange rate snapshots (BCV/Binance) for historical analysis
-
-4. **exchange_rates/** - Exchange rate tracking (VES/USD)
-   - `ExchangeRate`: Historical snapshots from multiple sources (BCV, Binance P2P)
-   - Real-time updates via `update_binance_rates` command:
-     - Two-query strategy: reference query + filtered query with transAmount in VES
-     - Filters offers for ~100 USD equivalent in bolivares
-     - Calculates simple average of 20 BUY and 20 SELL offers
-     - Consults Binance P2P API directly (no intermediaries)
-   - Historical data import via `fetch_binance_rates` and `import_bcv_rates` commands
-   - Each rate includes: source, rate (Bs/USD), date, timestamp, and notes
-   - See `BINANCE_AUTO_UPDATE.md` for automated collection setup (every 15 minutes)
-
-### Key Design Patterns
-
-**UUID Primary Keys**: All models use UUID for IDs (not auto-incrementing integers)
-
-**Exchange Rate Snapshots**: Each purchase stores BCV and Binance rates at purchase time, enabling:
-- Historical price analysis in stable currency
-- Comparison across different time periods
-- Both VES and USD calculations for all amounts
-
-**Product Normalization**: Two-tier product tracking:
-- `PurchaseItem.description`: Raw description from receipt (always stored)
-- `PurchaseItem.product`: Optional FK to normalized `Product` for aggregation/analysis
-
-**Inline Admin**: Purchase admin shows all items inline for efficient data entry
-
-### Database Relationships
-
-```
-User (Django auth)
-  └─> Purchase
-       ├─> Establishment (optional FK)
-       └─> PurchaseItem[]
-            └─> Product (optional FK)
-                 └─> ProductCategory (optional FK, hierarchical)
+**4. Statistical Outlier Removal** (IQR method in Binance updates)
+```python
+Q1 = percentile(prices, 25)
+Q3 = percentile(prices, 75)
+IQR = Q3 - Q1
+valid = [p for p in prices if Q1 - 1.5*IQR <= p <= Q3 + 1.5*IQR]
+avg_rate = sum(valid) / len(valid)
 ```
 
-### Configuration
-
-- Settings: `config/settings.py` - Uses `python-decouple` for env vars
-- URLs: `config/urls.py` - Currently only admin panel and API status endpoint
-- All configuration via environment variables (`.env` file, see `.env.example`)
-
-## Working with Models
-
-### When Adding/Modifying Models:
-
-1. Edit model in respective app's `models.py`
-2. Run `docker-compose exec web python manage.py makemigrations`
-3. Review generated migration file
-4. Run `docker-compose exec web python manage.py migrate`
-5. Update corresponding `admin.py` if needed
-6. Update `sql.sql` reference file if documenting schema changes
-
-### Model Conventions:
-
-- All models use `UUIDField` as primary key
-- All have `created_at` (auto_now_add) and/or `updated_at` (auto_now)
-- All have Spanish `verbose_name` and `verbose_name_plural`
-- All define `__str__` method for admin display
-- Indexes defined explicitly in Meta class
-
-## Admin Panel
-
-Access at `http://localhost:8000/admin` - This is the primary interface (no frontend yet).
-
-Admin configurations in each app's `admin.py`:
-- List views with filters and search
-- Readonly fields for IDs and timestamps
-- PurchaseAdmin uses TabularInline for items
-
-## Adding New Django Apps
-
-```bash
-# Create new app inside container
-docker-compose exec web python manage.py startapp app_name
-
-# Add to INSTALLED_APPS in config/settings.py
-# Create models, admin, migrations as needed
-```
+**5. Client-side Chart Statistics**
+- Dashboard calculates percentiles in JavaScript (not backend)
+- Historical bands exclude today's data for stable reference
+- Auto-refresh every 5 minutes without full page reload
 
 ## Database Schema
 
-Reference SQL schema in `sql.sql` - kept for documentation but Django migrations are source of truth.
+```
+User (auth_user)
+  └─> Purchase
+       ├─> Establishment (optional FK)
+       ├─> bcv_rate, binance_rate (Decimal snapshots)
+       └─> PurchaseItem[]
+            └─> Product (optional FK)
+                 ├─> ProductCategory (hierarchical parent-child)
+                 ├─> ProductBrand
+                 └─> ProductVariant[] (M2M via ProductVariantAssignment)
 
-Key indexes:
-- `establishments`: name
-- `products`: category, normalized_name
-- `purchases`: user, date, establishment, user+date composite
-- `purchase_items`: purchase, product, product+date composite
-
-## Environment Variables
-
-Required in `.env` (copy from `.env.example`):
-- Django: `SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`
-- Database: `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`
-- Docker: `WEB_PORT`
-
-For production: Change `SECRET_KEY`, set `DEBUG=False`, update `ALLOWED_HOSTS`, use strong DB passwords.
-
-## Static Files
-
-Managed by WhiteNoise middleware. `collectstatic` runs automatically on container startup via docker-compose command.
-
-## Application URLs
-
-- Home (status): `http://localhost:8000/` - Returns JSON with API status
-- Admin: `http://localhost:8000/admin/`
-- Database: `localhost:3306` (from host machine)
-- **Backup Download**: `POST /api/backup/download/` - Download compressed database backup (requires Bearer token)
-
-## Database Backup API
-
-The application provides a secure API endpoint for downloading complete database backups.
-
-### Endpoint Details
-
-- **URL**: `/api/backup/download/`
-- **Method**: `POST` or `GET`
-- **Authentication**: Bearer token (hardcoded)
-- **Response**: Compressed `.sql.gz` file with complete database dump
-
-### Authentication
-
-The endpoint requires a Bearer token in the Authorization header:
-
-```bash
-Authorization: Bearer financial-helper-backup-secret-2024
+ExchangeRate (standalone historical table)
+  └─> Unique index: source + timestamp
 ```
 
-**Security Token**: The token is hardcoded in `config/backup_views.py` (line 40):
-```python
-HARDCODED_TOKEN = 'financial-helper-backup-secret-2024'
+**Critical indexes**:
+- `exchange_rates`: `source+timestamp` (unique), `source+date`, `timestamp DESC`
+- `purchases`: `user+date`, `date`, `establishment`
+- `purchase_items`: `purchase`, `product+date`
+- `products`: `category`, `name`
+
+## Model Development Workflow
+
+**Adding/modifying models**:
+```bash
+# 1. Edit model in app's models.py
+# 2. Generate migration
+docker-compose exec web python manage.py makemigrations
+
+# 3. Review migration file in app/migrations/
+# 4. Apply migration
+docker-compose exec web python manage.py migrate
+
+# 5. Update admin.py if needed
+# 6. Consider adding indexes for frequent queries
 ```
 
-To change the token, edit this constant and restart the web container.
+**Model conventions** (strictly enforced):
+- `id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)`
+- `created_at = models.DateTimeField(auto_now_add=True)` (optional)
+- `updated_at = models.DateTimeField(auto_now=True)` (optional)
+- Spanish `verbose_name` and `verbose_name_plural` in Meta
+- `__str__` method returns meaningful representation
+- Explicit indexes in `Meta.indexes = [...]`
 
-### Usage Examples
+## Configuration & URLs
 
-**Local development**:
+**Environment** (`.env`):
+```env
+SECRET_KEY=<django-secret>              # Generate with get_random_secret_key()
+DEBUG=True                              # False in production
+ALLOWED_HOSTS=localhost,127.0.0.1       # Domain list in production
+DB_NAME=financial_helper
+DB_USER=django_user
+DB_PASSWORD=django_password             # Strong password in production
+DB_HOST=db                              # Docker service name
+DB_PORT=3306
+WEB_PORT=8000
+```
+
+**URL Map** (`config/urls.py`):
+| Route | Handler | Description |
+|-------|---------|-------------|
+| `/` | `chart_view` | Dashboard with 5 charts |
+| `/admin/` | Django Admin | CRUD interface |
+| `/api/status/` | `api_status` | JSON status |
+| `/api/exchange-rates/bcv/` | `api_bcv_rates` | Historical rates API |
+| `/api/products/by-categories/` | `get_products_by_categories` | Filter products |
+| `/api/process-invoice/` | `process_invoice_optimal` | OCR optimal |
+| `/api/process-with-params/` | `process_with_params` | OCR custom |
+| `/api/backup/download/` | `download_database_backup` | MySQL dump |
+| `/image-processor/test/` | `test_page` | OCR upload form |
+| `/image-processor/tuning/` | `tuning_page` | OCR param tuning |
+
+**Static files**: WhiteNoise middleware, auto-collected on container start
+
+## Backup System
+
+**Endpoint**: `POST /api/backup/download/`
+- **Auth**: `Authorization: Bearer financial-helper-backup-secret-2024`
+- **Token location**: `config/backup_views.py` line 40 (`HARDCODED_TOKEN`)
+- **Response**: `financial_helper_backup_YYYYMMDD_HHMMSS.sql.gz` (~100KB)
+- **Contents**: Full MySQL dump (DROP/CREATE + INSERT, gzip level 9)
+
+**Usage**:
 ```bash
+# Download
 curl -X POST "http://localhost:8000/api/backup/download/" \
   -H "Authorization: Bearer financial-helper-backup-secret-2024" \
-  --output backup_$(date +%Y%m%d_%H%M%S).sql.gz
-```
+  --output backup.sql.gz
 
-**Production**:
-```bash
-curl -X POST "https://financial-helper.andresjosehr.com/api/backup/download/" \
-  -H "Authorization: Bearer financial-helper-backup-secret-2024" \
-  --output backup_$(date +%Y%m%d_%H%M%S).sql.gz
-```
-
-### What's Included in the Backup
-
-The backup includes:
-- All table structures (CREATE TABLE statements with DROP TABLE IF EXISTS)
-- All data from all tables (INSERT statements)
-- MySQL configuration variables preservation
-- Proper character set and collation settings
-- Transaction safety with LOCK TABLES
-
-### Backup File Format
-
-- **Compression**: gzip level 9 (maximum compression)
-- **Format**: Standard MySQL dump SQL
-- **Naming**: `financial_helper_backup_YYYYMMDD_HHMMSS.sql.gz`
-- **Size**: Typically ~100KB compressed (depends on data volume)
-
-### Restoring from Backup
-
-```bash
-# Decompress and restore
+# Restore
 gunzip -c backup.sql.gz | docker-compose exec -T db mysql -u root -p financial_helper
-
-# Or decompress first, then restore
-gunzip backup.sql.gz
-docker-compose exec -T db mysql -u root -p financial_helper < backup.sql
 ```
 
-### Error Responses
+**Implementation**: Pure Python (no mysqldump binary), MySQLdb library, streaming response
 
-**Missing or invalid token**:
-```json
-{
-  "error": "Unauthorized",
-  "message": "Missing or invalid Authorization header. Format: Bearer <token>"
+## Important Technical Details
+
+### Exchange Rate Update Strategy
+
+**Binance P2P** (every 15 min recommended):
+1. Reference query (no transAmount) → get best rates
+2. Calculate ~100 USD equivalent in VES
+3. Filtered query with transAmount in VES → 20 offers each side
+4. IQR outlier removal on prices
+5. Save average + outlier count in notes
+
+**BCV** (hourly recommended):
+- Dual strategy: requests+BeautifulSoup (fast) → fallback to Playwright (reliable)
+- Only saves if rate changed (dedup by value)
+- Validates range: 50-500 Bs/USD
+
+### Chart.html Technical Notes
+
+**Data synchronization**:
+- BCV: Daily data (one rate per date)
+- Binance: Hourly snapshots (multiple per day)
+- **Gap filling**: `fillBcvGaps()` function repeats BCV rate for each Binance timestamp
+
+**Spread calculation**:
+```javascript
+spreadBs = binanceRate - bcvRate
+spreadPercent = (spreadBs / binanceRate) × 100
+```
+
+**Historical bands** (excludes today):
+```javascript
+const today = new Date().setHours(0,0,0,0);
+const historical = data.filter(r => r.date < todayStr);
+// Calculate MIN, AVG, P75, MAX on historical only
+```
+
+**Zoom levels**:
+- BCV chart: 7 days initial
+- Binance chart: 24 hours initial
+- Spread chart: Full range (user adjustable)
+
+### OCR Pipeline Technical Details
+
+**Detection strategy selection**:
+```python
+# Run 3 algorithms in parallel, select by area
+areas = {
+    'canny': detect_with_canny(img),
+    'otsu': detect_with_otsu(img),
+    'brightness': detect_with_brightness(img)
 }
+best = max(areas, key=lambda k: areas[k]['area'])
 ```
 
-**Wrong token**:
-```json
-{
-  "error": "Unauthorized",
-  "message": "Invalid authorization token"
-}
-```
+**Aspect ratio validation**: 0.3 ≤ height/width ≤ 3.0
+**Margin**: 3% added to detected bounds
+**Output formats**: `response_format=base64` (JSON) or `binary` (PNG)
 
-**Database error**:
-```json
-{
-  "error": "Internal server error",
-  "message": "<error details>"
-}
-```
+## Production Checklist
 
-### Implementation Details
+**Before deploying**:
+1. Generate new `SECRET_KEY`: `python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'`
+2. Set `DEBUG=False` in `.env`
+3. Update `ALLOWED_HOSTS` with domain
+4. Change `DB_PASSWORD` and `DB_ROOT_PASSWORD`
+5. Change `HARDCODED_TOKEN` in `config/backup_views.py`
+6. Setup cron jobs:
+   ```cron
+   */15 * * * * docker-compose exec -T web python manage.py update_binance_rates
+   0 * * * * docker-compose exec -T web python manage.py fetch_bcv_rate
+   0 3 * * * curl -X POST "http://localhost:8000/api/backup/download/" -H "Authorization: Bearer <token>" -o /backups/backup_$(date +\%Y\%m\%d).sql.gz
+   ```
+7. Configure HTTPS (Nginx reverse proxy recommended)
+8. Restrict `/admin/` by IP if possible
 
-The backup system is implemented in `config/backup_views.py` and uses:
-- Pure Python MySQL dump generation (no external `mysqldump` required)
-- MySQLdb/mysqlclient library for database connection
-- Temporary files for processing
-- Automatic cleanup of temporary files
-- Streaming response for large databases
+## Tech Stack Summary
+
+- **Backend**: Django 5.2.7, Python 3.11, MySQL 8.0, Gunicorn
+- **Frontend**: Alpine.js 3.x, TailwindCSS, TradingView Lightweight Charts
+- **Processing**: OpenCV, Pillow, NumPy, SciPy, BeautifulSoup4, Playwright
+- **Deployment**: Docker Compose, WhiteNoise (static), python-decouple (env)
