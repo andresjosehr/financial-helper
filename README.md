@@ -25,6 +25,7 @@ Financial Helper es una plataforma web completa para:
   - Distribución de spread (histograma de frecuencias)
 - **Calculadora bidireccional** BCV ↔ Binance en tiempo real
 - **API REST**: Consulta de tasas históricas con parámetros de fecha
+- **🚨 Alertas automáticas de spread**: Sistema inteligente que envía notificaciones a Telegram cuando el spread cambia de banda estadística (MIN/AVG/P75/MAX). Ver [ALERTAS_SPREAD.md](ALERTAS_SPREAD.md)
 
 **🛒 Gestión de Compras**
 - **Doble valoración**: Cada compra se guarda en VES, USD-BCV y USD-Binance

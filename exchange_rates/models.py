@@ -226,3 +226,124 @@ class ExchangeRate(models.Model):
         if rate:
             return usd_amount * rate
         return None
+
+
+class AlertState(models.Model):
+    """
+    Estado singleton del sistema de alertas de spread.
+
+    Almacena el estado actual de la banda de spread y las bandas históricas
+    calculadas. Solo debe existir 1 fila en esta tabla (singleton pattern).
+
+    Las bandas (MIN/AVG/P75/MAX) se recalculan una vez al día a las 00:00,
+    mientras que current_band se actualiza cada 15 minutos según el spread actual.
+    """
+
+    # Bandas de spread
+    BAND_MIN = 'MIN'
+    BAND_AVG = 'AVG'
+    BAND_P75 = 'P75'
+    BAND_MAX = 'MAX'
+
+    BANDS = [
+        (BAND_MIN, 'Mínimo (< AVG)'),
+        (BAND_AVG, 'Promedio (AVG - P75)'),
+        (BAND_P75, 'Percentil 75 (P75 - MAX)'),
+        (BAND_MAX, 'Máximo (>= MAX)'),
+    ]
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        verbose_name='ID'
+    )
+
+    # Estado actual
+    current_band = models.CharField(
+        max_length=10,
+        choices=BANDS,
+        verbose_name='Banda Actual',
+        help_text='Clasificación del spread actual según las bandas históricas'
+    )
+
+    last_check = models.DateTimeField(
+        verbose_name='Última Verificación',
+        help_text='Timestamp de la última verificación de spread (cada 15 min)'
+    )
+
+    last_alert_sent = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Última Alerta Enviada',
+        help_text='Timestamp de la última alerta enviada a Telegram'
+    )
+
+    # Cache de bandas históricas (recalculado diariamente)
+    bands_calculation_date = models.DateField(
+        verbose_name='Fecha de Cálculo de Bandas',
+        help_text='Fecha en que se calcularon las bandas históricas'
+    )
+
+    band_min_value = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        verbose_name='Valor Banda MIN',
+        help_text='Percentil 0 del spread histórico (%)'
+    )
+
+    band_avg_value = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        verbose_name='Valor Banda AVG',
+        help_text='Percentil 50 (mediana) del spread histórico (%)'
+    )
+
+    band_p75_value = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        verbose_name='Valor Banda P75',
+        help_text='Percentil 75 del spread histórico (%)'
+    )
+
+    band_max_value = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        verbose_name='Valor Banda MAX',
+        help_text='Percentil 100 (máximo) del spread histórico (%)'
+    )
+
+    class Meta:
+        db_table = 'alert_state'
+        verbose_name = 'Estado de Alertas'
+        verbose_name_plural = 'Estado de Alertas'
+
+    def __str__(self):
+        return f"Banda Actual: {self.current_band} | Última verificación: {self.last_check}"
+
+    def save(self, *args, **kwargs):
+        """
+        Garantiza que solo exista 1 instancia (singleton).
+        """
+        self.pk = uuid.UUID('00000000-0000-0000-0000-000000000001')
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_instance(cls):
+        """
+        Obtiene la única instancia del estado de alertas.
+        Crea una si no existe.
+        """
+        obj, created = cls.objects.get_or_create(
+            pk=uuid.UUID('00000000-0000-0000-0000-000000000001'),
+            defaults={
+                'current_band': cls.BAND_MIN,
+                'last_check': timezone.now(),
+                'bands_calculation_date': date.today() - timedelta(days=1),
+                'band_min_value': Decimal('0.00'),
+                'band_avg_value': Decimal('2.00'),
+                'band_p75_value': Decimal('3.00'),
+                'band_max_value': Decimal('5.00'),
+            }
+        )
+        return obj

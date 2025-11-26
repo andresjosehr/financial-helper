@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.db.models import Count, Max, Min
-from .models import ExchangeRate
+from .models import ExchangeRate, AlertState
 
 
 @admin.register(ExchangeRate)
@@ -197,3 +197,129 @@ class ExchangeRateAdmin(admin.ModelAdmin):
         css = {
             'all': ['admin/css/changelists.css']
         }
+
+
+@admin.register(AlertState)
+class AlertStateAdmin(admin.ModelAdmin):
+    """
+    Configuración del admin para el estado de alertas.
+    Solo debe existir 1 registro (singleton).
+    """
+
+    list_display = [
+        'current_band_display',
+        'spread_info',
+        'last_check',
+        'last_alert_sent',
+        'bands_calculation_date',
+    ]
+
+    readonly_fields = [
+        'id',
+        'current_band_display',
+        'last_check',
+        'last_alert_sent',
+        'bands_calculation_date',
+        'band_min_value',
+        'band_avg_value',
+        'band_p75_value',
+        'band_max_value',
+        'spread_info',
+    ]
+
+    fieldsets = [
+        ('Estado Actual', {
+            'fields': ['current_band_display', 'spread_info']
+        }),
+        ('Timestamps', {
+            'fields': ['last_check', 'last_alert_sent']
+        }),
+        ('Bandas Históricas (Cache)', {
+            'fields': [
+                'bands_calculation_date',
+                'band_min_value',
+                'band_avg_value',
+                'band_p75_value',
+                'band_max_value',
+            ],
+            'description': 'Bandas calculadas una vez al día (excluye datos del día actual)'
+        }),
+        ('Metadatos', {
+            'fields': ['id'],
+            'classes': ['collapse']
+        }),
+    ]
+
+    def has_add_permission(self, request):
+        """No permitir crear nuevos registros (singleton)."""
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        """No permitir eliminar el registro (singleton)."""
+        return False
+
+    def current_band_display(self, obj):
+        """Muestra la banda actual con color distintivo."""
+        colors = {
+            'MIN': '#16a34a',  # Verde
+            'AVG': '#eab308',  # Amarillo
+            'P75': '#f97316',  # Naranja
+            'MAX': '#dc2626',  # Rojo
+        }
+        color = colors.get(obj.current_band, '#6b7280')
+        return format_html(
+            '<span style="color: {}; font-weight: bold; font-size: 16px;">{}</span>',
+            color,
+            obj.get_current_band_display()
+        )
+    current_band_display.short_description = 'Banda Actual'
+
+    def spread_info(self, obj):
+        """Muestra información del spread actual."""
+        try:
+            from exchange_rates.alert_utils import calculate_current_spread
+
+            spread_percent, bcv_rate, binance_rate = calculate_current_spread()
+
+            if spread_percent is None:
+                return format_html('<span style="color: gray;">Sin datos</span>')
+
+            # Determinar color según banda
+            colors = {
+                'MIN': '#16a34a',
+                'AVG': '#eab308',
+                'P75': '#f97316',
+                'MAX': '#dc2626',
+            }
+            color = colors.get(obj.current_band, '#6b7280')
+
+            html = [
+                f'<div style="padding: 10px; background: #f3f4f6; border-radius: 4px;">',
+                f'<div style="font-size: 18px; font-weight: bold; color: {color};">',
+                f'{spread_percent:.2f}%</div>',
+                f'<div style="margin-top: 8px; font-size: 12px; color: #6b7280;">',
+                f'BCV: {bcv_rate:.4f} Bs/USD<br>',
+                f'Binance: {binance_rate:.4f} Bs/USD',
+                f'</div>',
+                f'</div>'
+            ]
+
+            return format_html(''.join(html))
+        except Exception as e:
+            return format_html(
+                '<span style="color: #dc2626;">Error: {}</span>',
+                str(e)
+            )
+
+    spread_info.short_description = 'Spread Actual'
+
+    def changelist_view(self, request, extra_context=None):
+        """Redirigir al único registro si existe."""
+        if AlertState.objects.exists():
+            obj = AlertState.get_instance()
+            from django.shortcuts import redirect
+            from django.urls import reverse
+            return redirect(
+                reverse('admin:exchange_rates_alertstate_change', args=[obj.pk])
+            )
+        return super().changelist_view(request, extra_context=extra_context)

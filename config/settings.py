@@ -151,6 +151,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 GEMINI_COOKIES = config('GEMINI_COOKIES', default='')
 GEMINI_PROXY = config('GEMINI_PROXY', default=None)
 
+# Telegram Alert Configuration
+TELEGRAM_ALERT_URL = config('TELEGRAM_ALERT_URL', default='')
+
 # Media files (uploads)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'

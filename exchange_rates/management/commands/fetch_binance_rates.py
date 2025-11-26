@@ -204,6 +204,58 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS('=' * 70))
             self.stdout.write('')
 
+            # SISTEMA DE ALERTAS: Verificar spread y enviar alertas si cambió de banda
+            self.stdout.write('🔔 Verificando sistema de alertas de spread...')
+
+            from exchange_rates.alert_utils import check_and_alert
+
+            try:
+                alert_result = check_and_alert()
+
+                if alert_result['success']:
+                    spread_pct = alert_result['spread_percent']
+                    current_band = alert_result['current_band']
+                    previous_band = alert_result['previous_band']
+
+                    # Mostrar información de bandas
+                    if alert_result['bands_recalculated']:
+                        self.stdout.write(self.style.WARNING('  📊 Bandas recalculadas (nuevo día):'))
+                        bands = alert_result['bands']
+                        self.stdout.write(f"     MIN: {bands['min']:.2f}% | AVG: {bands['avg']:.2f}% | P75: {bands['p75']:.2f}% | MAX: {bands['max']:.2f}%")
+
+                    # Mostrar estado actual
+                    self.stdout.write(f'  📈 Spread actual: {spread_pct:.2f}% → Banda: {current_band}')
+
+                    # Mostrar si hubo cambio de banda
+                    if alert_result['band_changed']:
+                        self.stdout.write(
+                            self.style.WARNING(f'  🚨 CAMBIO DE BANDA: {previous_band} → {current_band}')
+                        )
+
+                        if alert_result['alert_sent']:
+                            self.stdout.write(
+                                self.style.SUCCESS('  ✓ Alerta enviada a Telegram')
+                            )
+                        else:
+                            self.stdout.write(
+                                self.style.ERROR('  ✗ Error enviando alerta a Telegram (verificar TELEGRAM_ALERT_URL)')
+                            )
+                    else:
+                        self.stdout.write(f'  ✓ Sin cambios (banda: {current_band})')
+
+                else:
+                    self.stdout.write(
+                        self.style.WARNING(f"  ⚠️  {alert_result.get('error', 'Error desconocido')}")
+                    )
+
+            except Exception as alert_error:
+                self.stdout.write(
+                    self.style.ERROR(f'  ❌ Error en sistema de alertas: {alert_error}')
+                )
+                # No fallar el comando si las alertas fallan
+
+            self.stdout.write('')
+
         except Exception as e:
             self.stdout.write(
                 self.style.ERROR(f'❌ Error inesperado: {e}')
