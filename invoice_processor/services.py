@@ -1,6 +1,7 @@
 """
 Servicios para procesamiento de facturas.
 """
+import json
 import logging
 from decimal import Decimal
 from typing import Dict, Any, Optional, Tuple
@@ -90,6 +91,13 @@ class InvoiceProcessorService:
                 }
             }
 
+            # Log del JSON final normalizado para verificación
+            logger.info("="*80)
+            logger.info("JSON FINAL NORMALIZADO (antes de guardar en BD):")
+            logger.info("="*80)
+            logger.info(json.dumps(normalized_data, indent=2, ensure_ascii=False, default=str))
+            logger.info("="*80)
+
             # Paso 8: Guardar en BD
             purchase = self._save_to_database(
                 normalized_data,
@@ -98,7 +106,11 @@ class InvoiceProcessorService:
                 user
             )
 
-            # Paso 9: Generar resumen para Telegram
+            # Paso 9: Guardar imagen si es tipo image
+            if file_type == 'image':
+                self._save_invoice_image(purchase, file_binary, mime_type)
+
+            # Paso 10: Generar resumen para Telegram
             summary = self._generate_summary(purchase)
 
             logger.info(f"Factura procesada exitosamente: {purchase.id}")
@@ -737,3 +749,32 @@ class InvoiceProcessorService:
 ID: {purchase.id}"""
 
         return summary
+
+    def _save_invoice_image(self, purchase: Purchase, image_binary: bytes, mime_type: str) -> None:
+        """
+        Guarda la imagen original de la factura.
+
+        Args:
+            purchase: Purchase al que asociar la imagen
+            image_binary: Bytes de la imagen original
+            mime_type: Tipo MIME de la imagen
+        """
+        from django.core.files.base import ContentFile
+
+        # Determinar extensión según MIME type
+        ext_map = {
+            'image/jpeg': 'jpg',
+            'image/jpg': 'jpg',
+            'image/png': 'png',
+            'image/gif': 'gif',
+            'image/webp': 'webp',
+        }
+        ext = ext_map.get(mime_type, 'jpg')
+
+        # Nombre del archivo
+        filename = f"{purchase.id}.{ext}"
+
+        # Guardar imagen
+        purchase.invoice_image.save(filename, ContentFile(image_binary), save=True)
+
+        logger.info(f"✓ Imagen de factura guardada: {purchase.invoice_image.name}")

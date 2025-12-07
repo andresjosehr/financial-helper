@@ -28,6 +28,7 @@ services:
     volumes:
       - .:/app
       - static_volume:/app/staticfiles
+      - media_volume:/app/media
     ports:
       - "${WEB_PORT:-8000}:8000"
     environment:
@@ -47,3 +48,4 @@ services:
 volumes:
   mysql_data:
   static_volume:
+  media_volume:

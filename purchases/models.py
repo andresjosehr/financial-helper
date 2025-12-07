@@ -37,6 +37,19 @@ class Purchase(models.Model):
     # Original JSON
     raw_json = models.JSONField(blank=True, null=True, verbose_name='JSON Original')
 
+    # Invoice image
+    def invoice_image_path(instance, filename):
+        """Genera ruta: invoices/YYYY/MM/{uuid}.{ext}"""
+        ext = filename.split('.')[-1] if '.' in filename else 'png'
+        return f"invoices/{instance.purchase_date.year}/{instance.purchase_date.month:02d}/{instance.id}.{ext}"
+
+    invoice_image = models.ImageField(
+        upload_to=invoice_image_path,
+        blank=True,
+        null=True,
+        verbose_name='Imagen de Factura'
+    )
+
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de Creación')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Fecha de Actualización')
 

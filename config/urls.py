@@ -1,6 +1,8 @@
 from django.contrib import admin
 from django.urls import path, include
 from django.http import JsonResponse
+from django.conf import settings
+from django.conf.urls.static import static
 from products.views import get_products_by_categories
 from exchange_rates.views import chart_view
 from config.backup_views import download_database_backup
@@ -30,4 +32,9 @@ urlpatterns = [
     path('exchange-rates/', include('exchange_rates.urls')),
     path('api/exchange-rates/', include('exchange_rates.urls')),
     path('api/backup/download/', download_database_backup, name='backup-download'),
+    path('purchases/', include('purchases.urls')),
 ]
+
+# Servir archivos media en desarrollo
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
