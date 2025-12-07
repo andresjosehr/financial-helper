@@ -234,7 +234,7 @@ def update_alert_state_bands(force=False):
         return False
 
     # Calcular nuevas bandas
-    spreads = calculate_historical_spreads(days=30, exclude_today=True)
+    spreads = calculate_historical_spreads(days=5, exclude_today=True)
     bands = calculate_spread_bands(spreads)
 
     if not bands:
@@ -269,6 +269,9 @@ def check_and_alert():
 
     # 2. Actualizar bandas si cambió el día
     bands_recalculated = update_alert_state_bands()
+
+    # 2.1 Refrescar objeto desde BD para obtener bandas actualizadas
+    state.refresh_from_db()
 
     # 3. Calcular spread actual
     spread_percent, bcv_rate, binance_rate = calculate_current_spread()

@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from django.shortcuts import render
 from django.http import JsonResponse
-from .models import ExchangeRate
+from .models import ExchangeRate, AlertState
 
 
 def chart_view(request):
@@ -47,6 +47,9 @@ def api_bcv_rates(request):
         date__lte=end_date
     ).order_by('timestamp').values('timestamp', 'rate')
 
+    # Obtener bandas desde AlertState
+    alert_state = AlertState.get_instance()
+
     # Formatear respuesta
     data = {
         'start_date': start_date.isoformat(),
@@ -65,7 +68,15 @@ def api_bcv_rates(request):
                 'rate': float(rate['rate'])
             }
             for rate in binance_rates
-        ]
+        ],
+        'bands': {
+            'min': float(alert_state.band_min_value),
+            'avg': float(alert_state.band_avg_value),
+            'p75': float(alert_state.band_p75_value),
+            'max': float(alert_state.band_max_value),
+            'calculation_date': alert_state.bands_calculation_date.isoformat(),
+            'current_band': alert_state.current_band,
+        }
     }
 
     return JsonResponse(data)

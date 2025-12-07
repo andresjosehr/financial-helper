@@ -447,7 +447,7 @@
                         }
 
 
-                        this.calculateStats(data.bcv, data.binance_sell);
+                        this.calculateStats(data.bcv, data.binance_sell, data.bands);
                         this.lastBinanceDate = data.binance_sell.length > 0 ? data.binance_sell[data.binance_sell.length - 1].timestamp : null;
                         this.calculateFromBcv();
                         this.renderAllCharts(data.bcv, data.binance_sell);
@@ -460,7 +460,7 @@
                     }
                 },
 
-                calculateStats(bcvRates, binanceRates) {
+                calculateStats(bcvRates, binanceRates, bands) {
                     // Determinar "hoy" (medianoche) para separar datos históricos
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);
@@ -501,122 +501,16 @@
                         this.stats.spreadPercent = (this.stats.spread / this.stats.binance.current) * 100;
                     }
 
-                    // Calcular estadísticas del spread HISTÓRICO (excluyendo hoy)
-                    // Esto sirve como referencia estable para las bandas
-                    if (bcvHistorical.length > 0 && binanceHistorical.length > 0) {
-                        const bcvMap = new Map();
-                        bcvHistorical.forEach(r => {
-                            bcvMap.set(r.date, parseFloat(r.rate));
-                        });
-
-                        // Calcular spreads para todos los puntos históricos de Binance
-                        const spreadPercents = [];
-                        const spreadBs = [];
-
-                        binanceHistorical.forEach(r => {
-                            const date = r.timestamp.split('T')[0];
-                            const bcvRate = bcvMap.get(date);
-                            const binanceRate = parseFloat(r.rate);
-
-                            if (bcvRate && !isNaN(binanceRate) && binanceRate > 0 && bcvRate > 0) {
-                                const spreadPct = ((binanceRate - bcvRate) / binanceRate) * 100;
-                                const spreadB = binanceRate - bcvRate;
-
-                                if (!isNaN(spreadPct) && isFinite(spreadPct)) {
-                                    spreadPercents.push(spreadPct);
-                                    spreadBs.push(spreadB);
-                                }
-                            }
-                        });
-
-                        if (spreadPercents.length > 0) {
-                            // Ordenar para calcular percentiles
-                            const sortedPercents = [...spreadPercents].sort((a, b) => a - b);
-                            const sortedBs = [...spreadBs].sort((a, b) => a - b);
-
-                            const avg = spreadPercents.reduce((a, b) => a + b, 0) / spreadPercents.length;
-                            const avgBs = spreadBs.reduce((a, b) => a + b, 0) / spreadBs.length;
-
-                            // Calcular desviación estándar
-                            const variance = spreadPercents.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / spreadPercents.length;
-                            const stdDev = Math.sqrt(variance);
-
-                            // Calcular percentiles
-                            const p25 = sortedPercents[Math.floor(sortedPercents.length * 0.25)];
-                            const p50 = sortedPercents[Math.floor(sortedPercents.length * 0.50)];
-                            const p75 = sortedPercents[Math.floor(sortedPercents.length * 0.75)];
-
-                            this.stats.spreadStats = {
-                                avg: avg,
-                                avgBs: avgBs,
-                                max: Math.max(...spreadPercents),
-                                min: Math.min(...spreadPercents),
-                                maxBs: Math.max(...spreadBs),
-                                minBs: Math.min(...spreadBs),
-                                stdDev: stdDev,
-                                p25: p25,
-                                p50: p50,
-                                p75: p75,
-                                spreadPercents: spreadPercents,
-                                spreadBs: spreadBs
-                            };
-                        }
-                    } else if (bcvRates.length > 0 && binanceRates.length > 0) {
-                        // Fallback: Si no hay datos históricos suficientes, usar todos los datos
-                        // Esto puede pasar si solo estamos viendo datos de hoy
-                        const bcvMap = new Map();
-                        bcvRates.forEach(r => {
-                            bcvMap.set(r.date, parseFloat(r.rate));
-                        });
-
-                        const spreadPercents = [];
-                        const spreadBs = [];
-
-                        binanceRates.forEach(r => {
-                            const date = r.timestamp.split('T')[0];
-                            const bcvRate = bcvMap.get(date);
-                            const binanceRate = parseFloat(r.rate);
-
-                            if (bcvRate && !isNaN(binanceRate) && binanceRate > 0 && bcvRate > 0) {
-                                const spreadPct = ((binanceRate - bcvRate) / binanceRate) * 100;
-                                const spreadB = binanceRate - bcvRate;
-
-                                if (!isNaN(spreadPct) && isFinite(spreadPct)) {
-                                    spreadPercents.push(spreadPct);
-                                    spreadBs.push(spreadB);
-                                }
-                            }
-                        });
-
-                        if (spreadPercents.length > 0) {
-                            const sortedPercents = [...spreadPercents].sort((a, b) => a - b);
-                            const sortedBs = [...spreadBs].sort((a, b) => a - b);
-
-                            const avg = spreadPercents.reduce((a, b) => a + b, 0) / spreadPercents.length;
-                            const avgBs = spreadBs.reduce((a, b) => a + b, 0) / spreadBs.length;
-
-                            const variance = spreadPercents.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / spreadPercents.length;
-                            const stdDev = Math.sqrt(variance);
-
-                            const p25 = sortedPercents[Math.floor(sortedPercents.length * 0.25)];
-                            const p50 = sortedPercents[Math.floor(sortedPercents.length * 0.50)];
-                            const p75 = sortedPercents[Math.floor(sortedPercents.length * 0.75)];
-
-                            this.stats.spreadStats = {
-                                avg: avg,
-                                avgBs: avgBs,
-                                max: Math.max(...spreadPercents),
-                                min: Math.min(...spreadPercents),
-                                maxBs: Math.max(...spreadBs),
-                                minBs: Math.min(...spreadBs),
-                                stdDev: stdDev,
-                                p25: p25,
-                                p50: p50,
-                                p75: p75,
-                                spreadPercents: spreadPercents,
-                                spreadBs: spreadBs
-                            };
-                        }
+                    // Usar bandas desde la API (calculadas en el backend con AlertState)
+                    if (bands) {
+                        this.stats.spreadStats = {
+                            min: bands.min,
+                            avg: bands.avg,
+                            p75: bands.p75,
+                            max: bands.max,
+                            currentBand: bands.current_band,
+                            calculationDate: bands.calculation_date
+                        };
                     }
                 },
 
