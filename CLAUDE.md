@@ -42,7 +42,7 @@ curl -X POST "http://localhost:8000/api/backup/download/" \       # Backup API
 gunzip -c backup.sql.gz | docker-compose exec -T db mysql -u root -p financial_helper  # Restore
 ```
 
-## Architecture (6 Django Apps)
+## Architecture (7 Django Apps)
 
 ### 1. exchange_rates/ ⭐ (Core System)
 
@@ -127,7 +127,69 @@ gunzip -c backup.sql.gz | docker-compose exec -T db mysql -u root -p financial_h
 
 **Model**: `Establishment` - name, legal_name, tax_id (RIF/NIT), address, city, state, postal_code, country, phone, email, website
 
-### 6. users/
+### 6. invoice_processor/ 🆕 (n8n Integration)
+
+**Purpose**: Automated invoice processing from Telegram → n8n → Django
+
+**Service**: `InvoiceProcessorService`
+- Accepts audio (OGG) or image (JPEG/PNG) from n8n
+- Transcribes audio with Gemini API (gemini-2.0-flash-exp)
+- Analyzes image with Gemini API after OCR optimization
+- Extracts structured purchase data (establishment, items, totals)
+- Fetches latest exchange rates from BD (not external APIs)
+- Categorizes products using existing ProductCategory hierarchy
+- Normalizes products (generic name + brand + variants)
+- Saves to BD: Purchase + PurchaseItem + Product associations
+- Returns formatted summary for Telegram bot
+
+**Client**: `GeminiClient` (`gemini_client.py`)
+- Methods: `transcribe_audio()`, `analyze_image()`, `extract_invoice_from_text()`, `categorize_products()`, `normalize_products()`
+- Uses google-generativeai library (API key in GEMINI_API_KEY env var)
+- Smart JSON parsing: handles code fences, escaped chars, trailing commas
+
+**API**: `POST /api/invoice-processor/process/`
+- **Request** (multipart/form-data):
+  - `file`: Binary file (audio or image)
+  - `file_type`: "audio" or "image"
+  - `mime_type`: Optional (defaults: audio/ogg for audio, image/jpeg for image)
+  - `telegram_user`: **REQUIRED** - Telegram username (without @)
+- **Response** (JSON):
+  ```json
+  {
+    "success": true,
+    "purchase_id": "uuid-string",
+    "summary": "✅ Factura procesada...\n📍 Establecimiento: ...\n💰 Total: Bs.150.00\n💵 USD (BCV): $2.56"
+  }
+  ```
+- **User handling**: Auto-creates User + UserProfile if `telegram_user` doesn't exist
+- **Error handling**: Returns 400 for validation errors, 500 for internal errors
+- **Note**: CSRF exempt for n8n integration
+
+**Pipeline** (9 steps):
+1. Receive file from n8n (audio or image)
+2. Process audio: Transcribe → Extract structured data OR Process image: Optimize with existing pipeline → Analyze with Gemini
+3. Normalize audio/image format to common structure
+4. Get latest exchange rates from ExchangeRate.get_latest_rates()
+5. Calculate USD values (total_usd_bcv, total_usd_binance) for purchase and items
+6. Get ProductCategory hierarchy from BD
+7. Categorize items with Gemini (assigns category_1 parent, category_2 child)
+8. Get existing products filtered by assigned categories
+9. Normalize products with Gemini (extract name, brand, variants)
+10. Save to BD in transaction: Establishment → Purchase → PurchaseItems → Product associations
+11. Generate Telegram summary
+
+**Product Normalization Rules**:
+- Name: Generic, no brands/weights/variants (e.g., "Mantequilla", not "Mantequilla Mavesa 200g")
+- Brand: Single string or null (e.g., "Mavesa")
+- Variants: Array of {type, value} (types: size, flavor, color, version, material, package)
+- Reuses existing products when name matches (ignores brand/variants in comparison)
+- Auto-creates "Sin Clasificar" category for unmatched items
+
+**Management Command**: `create_uncategorized_category`
+- Creates ProductCategory "Sin Clasificar" if not exists
+- Used as fallback for items without category assignment
+
+### 7. users/
 
 Empty structure extending Django User (FK in Purchase)
 
@@ -222,6 +284,7 @@ DB_PASSWORD=django_password             # Strong password in production
 DB_HOST=db                              # Docker service name
 DB_PORT=3306
 WEB_PORT=8000
+GEMINI_API_KEY=<your-api-key>          # Google Gemini API key (required for invoice_processor)
 ```
 
 **URL Map** (`config/urls.py`):
@@ -232,6 +295,7 @@ WEB_PORT=8000
 | `/api/status/` | `api_status` | JSON status |
 | `/api/exchange-rates/bcv/` | `api_bcv_rates` | Historical rates API |
 | `/api/products/by-categories/` | `get_products_by_categories` | Filter products |
+| `/api/invoice-processor/process/` | `process_invoice_from_n8n` | n8n invoice processing (audio/image) |
 | `/api/process-invoice/` | `process_invoice_optimal` | OCR optimal |
 | `/api/process-with-params/` | `process_with_params` | OCR custom |
 | `/api/backup/download/` | `download_database_backup` | MySQL dump |

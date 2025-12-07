@@ -40,3 +40,6 @@ logs/*.log
 
 backup.sql.gz
 restore_database.md
+
+financial-helper-binance.log.bk
+django.log.bk

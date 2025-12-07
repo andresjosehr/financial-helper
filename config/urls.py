@@ -13,6 +13,7 @@ def api_status(request):
             'admin': '/admin/',
             'image_processor_test': '/image-processor/test/',
             'process_invoice': '/api/process-invoice/',
+            'invoice_processor': '/api/invoice-processor/process/',
             'products_by_categories': '/api/products/by-categories/',
             'database_backup': '/api/backup/download/',
         }
@@ -24,6 +25,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('image-processor/', include('image_processor.urls')),
     path('api/', include('image_processor.urls')),
+    path('api/invoice-processor/', include('invoice_processor.urls')),
     path('api/products/by-categories/', get_products_by_categories, name='products-by-categories'),
     path('exchange-rates/', include('exchange_rates.urls')),
     path('api/exchange-rates/', include('exchange_rates.urls')),

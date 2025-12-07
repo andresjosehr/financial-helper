@@ -28,11 +28,22 @@ DEBUG = config('DEBUG', default=True, cast=bool)
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='financial-helper.andresjosehr.com,localhost,127.0.0.1', cast=lambda v: [s.strip() for s in v.split(',')])
 
+# Permitir dominios de LocalTunnel
+if config('DEBUG', default=True, cast=bool):
+    ALLOWED_HOSTS += ['financial-helper-dev.loca.lt']
+
 # CSRF Settings
 CSRF_TRUSTED_ORIGINS = [
     'https://financial-helper.andresjosehr.com',
     'http://financial-helper.andresjosehr.com',
 ]
+
+# Permitir LocalTunnel en modo DEBUG
+if DEBUG:
+    CSRF_TRUSTED_ORIGINS += [
+        'https://*.loca.lt',
+        'http://*.loca.lt',
+    ]
 
 
 # Application definition
@@ -52,6 +63,7 @@ INSTALLED_APPS = [
     'users',
     'image_processor',
     'exchange_rates',
+    'invoice_processor',
 ]
 
 MIDDLEWARE = [
@@ -150,6 +162,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Gemini API Configuration
 GEMINI_COOKIES = config('GEMINI_COOKIES', default='')
 GEMINI_PROXY = config('GEMINI_PROXY', default=None)
+GEMINI_API_KEY = config('GEMINI_API_KEY', default='')
 
 # Telegram Alert Configuration
 TELEGRAM_ALERT_URL = config('TELEGRAM_ALERT_URL', default='')
@@ -201,6 +214,11 @@ LOGGING = {
             'propagate': False,
         },
         'ocr': {
+            'handlers': ['file', 'console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'invoice_processor': {
             'handlers': ['file', 'console'],
             'level': 'DEBUG',
             'propagate': False,

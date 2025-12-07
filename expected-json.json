@@ -1,0 +1,328 @@
+[
+  {
+    "purchase": {
+      "purchase_date": "2025-10-19",
+      "purchase_time": "11:51",
+      "subtotal_ves": 8938.71,
+      "total_ves": 10336.98,
+      "bcv_rate": 58.65,
+      "binance_rate": 58.65,
+      "total_usd_bcv": 176.25,
+      "total_usd_binance": 176.25,
+      "tax_ves": 1398.27,
+      "tax_type": "IVA",
+      "tax_percentage": 16,
+      "notes": "Biopago: 10.336,98",
+      "raw_json": null,
+      "establishment": {
+        "name": "FARMATODO, C.A.",
+        "legal_name": "FARMATODO, C.A.",
+        "tax_id": "J-000202001",
+        "address": "Av Los Guayabitos, CC Expreso Baruta Nivel 5 Of Unica, Urb La Trinidad (Sector Piedra Azul), Caracas. / Zona Ind de Maturin Parcela Lote P",
+        "city": "Maturin",
+        "state": null,
+        "postal_code": null,
+        "country": "Venezuela",
+        "phone": "0800-FARMATODO",
+        "email": null,
+        "website": null
+      },
+      "purchase_items": [
+        {
+          "product_code": "111197799",
+          "description": "Gel Fijador Rolda Blanco 25 (G)",
+          "quantity": 1,
+          "unit_type": "Unidad",
+          "notes": null,
+          "total_usd_bcv": 10.71,
+          "total_usd_binance": 10.71,
+          "total_ves": 628,
+          "category_1": "Cuidado Personal",
+          "category_2": "Cuidado del Cabello",
+          "producto": {
+            "name": "Gel Fijador",
+            "brand": "Rolda",
+            "variants": [
+              {
+                "type": "color",
+                "value": "Blanco"
+              },
+              {
+                "type": "size",
+                "value": "25g"
+              }
+            ]
+          }
+        },
+        {
+          "product_code": "111262157",
+          "description": "Removedor Farmatodo 60Ml (G)",
+          "quantity": 1,
+          "unit_type": "Unidad",
+          "notes": null,
+          "total_usd_bcv": 8.59,
+          "total_usd_binance": 8.59,
+          "total_ves": 503.96,
+          "category_1": "Cuidado Personal",
+          "category_2": "Cuidado de Manos y Uñas",
+          "producto": {
+            "name": "Removedor",
+            "brand": "Farmatodo",
+            "variants": [
+              {
+                "type": "size",
+                "value": "60ml"
+              }
+            ]
+          }
+        },
+        {
+          "product_code": "111287258",
+          "description": "Enjuague Bucal Farmatodo Or (G)",
+          "quantity": 1,
+          "unit_type": "Unidad",
+          "notes": null,
+          "total_usd_bcv": 13.98,
+          "total_usd_binance": 13.98,
+          "total_ves": 820.15,
+          "category_1": "Cuidado Personal",
+          "category_2": "Cuidado Dental",
+          "producto": {
+            "name": "Enjuague Bucal",
+            "brand": "Farmatodo",
+            "variants": [
+              {
+                "type": "version",
+                "value": "Original"
+              }
+            ]
+          }
+        },
+        {
+          "product_code": "111348890",
+          "description": "Enjuague Bucal Farmatodo Me (G)",
+          "quantity": 1,
+          "unit_type": "Unidad",
+          "notes": null,
+          "total_usd_bcv": 5.47,
+          "total_usd_binance": 5.47,
+          "total_ves": 320.87,
+          "category_1": "Cuidado Personal",
+          "category_2": "Cuidado Dental",
+          "producto": {
+            "name": "Enjuague Bucal",
+            "brand": "Farmatodo",
+            "variants": [
+              {
+                "type": "flavor",
+                "value": "Menta"
+              }
+            ]
+          }
+        },
+        {
+          "product_code": "111434891",
+          "description": "Acido Folico 10mg 30comprim (E)",
+          "quantity": 1,
+          "unit_type": "Unidad",
+          "notes": "Exento",
+          "total_usd_bcv": 3.4,
+          "total_usd_binance": 3.4,
+          "total_ves": 199.55,
+          "category_1": "Salud y Farmacia",
+          "category_2": "Vitaminas y Suplementos",
+          "producto": {
+            "name": "Acido Folico",
+            "brand": null,
+            "variants": [
+              {
+                "type": "size",
+                "value": "10mg"
+              },
+              {
+                "type": "size",
+                "value": "30 comprimidos"
+              }
+            ]
+          }
+        },
+        {
+          "product_code": "111927633",
+          "description": "Protector Termico Capilar N (G)",
+          "quantity": 1,
+          "unit_type": "Unidad",
+          "notes": null,
+          "total_usd_bcv": 23.93,
+          "total_usd_binance": 23.93,
+          "total_ves": 1403.73,
+          "category_1": "Cuidado Personal",
+          "category_2": "Cuidado del Cabello",
+          "producto": {
+            "name": "Protector Termico Capilar",
+            "brand": null,
+            "variants": []
+          }
+        },
+        {
+          "product_code": "112000742",
+          "description": "Gel Farmatodo Antibacterial (G)",
+          "quantity": 1,
+          "unit_type": "Unidad",
+          "notes": null,
+          "total_usd_bcv": 5.28,
+          "total_usd_binance": 5.28,
+          "total_ves": 309.82,
+          "category_1": "Cuidado Personal",
+          "category_2": "Higiene Corporal",
+          "producto": {
+            "name": "Gel Antibacterial",
+            "brand": "Farmatodo",
+            "variants": []
+          }
+        },
+        {
+          "product_code": "114730546",
+          "description": "Desodorante Barra Rexona Wo (G)",
+          "quantity": 1,
+          "unit_type": "Unidad",
+          "notes": null,
+          "total_usd_bcv": 23.77,
+          "total_usd_binance": 23.77,
+          "total_ves": 1394.4,
+          "category_1": "Cuidado Personal",
+          "category_2": "Desodorantes",
+          "producto": {
+            "name": "Desodorante",
+            "brand": "Rexona",
+            "variants": [
+              {
+                "type": "package",
+                "value": "Barra"
+              },
+              {
+                "type": "version",
+                "value": "Woman"
+              }
+            ]
+          }
+        },
+        {
+          "product_code": "114731426",
+          "description": "Desodorante Spray Rexona Wo (G)",
+          "quantity": 1,
+          "unit_type": "Unidad",
+          "notes": null,
+          "total_usd_bcv": 28.53,
+          "total_usd_binance": 28.53,
+          "total_ves": 1673.3,
+          "category_1": "Cuidado Personal",
+          "category_2": "Desodorantes",
+          "producto": {
+            "name": "Desodorante",
+            "brand": "Rexona",
+            "variants": [
+              {
+                "type": "package",
+                "value": "Spray"
+              },
+              {
+                "type": "version",
+                "value": "Woman"
+              }
+            ]
+          }
+        },
+        {
+          "product_code": "115401496",
+          "description": "Toallas Desmaquillan 2x (G)",
+          "quantity": 1,
+          "unit_type": "Unidad",
+          "notes": null,
+          "total_usd_bcv": 7.45,
+          "total_usd_binance": 7.45,
+          "total_ves": 436.9,
+          "category_1": "Cuidado Personal",
+          "category_2": "Cuidado Facial",
+          "producto": {
+            "name": "Toallas Desmaquillantes",
+            "brand": null,
+            "variants": [
+              {
+                "type": "size",
+                "value": "2 unidades"
+              }
+            ]
+          }
+        },
+        {
+          "product_code": "115513535",
+          "description": "Kit Viajero Iceberg 2x (G)",
+          "quantity": 1,
+          "unit_type": "Unidad",
+          "notes": null,
+          "total_usd_bcv": 19.79,
+          "total_usd_binance": 19.79,
+          "total_ves": 1160.46,
+          "category_1": "Cuidado Personal",
+          "category_2": "Higiene Corporal",
+          "producto": {
+            "name": "Kit Viajero",
+            "brand": "Iceberg",
+            "variants": [
+              {
+                "type": "size",
+                "value": "2 unidades"
+              }
+            ]
+          }
+        },
+        {
+          "product_code": "115588502",
+          "description": "Aceite Capilar Farmatodo Ma (G)",
+          "quantity": 1,
+          "unit_type": "Unidad",
+          "notes": null,
+          "total_usd_bcv": 8.57,
+          "total_usd_binance": 8.57,
+          "total_ves": 502.43,
+          "category_1": "Cuidado Personal",
+          "category_2": "Cuidado del Cabello",
+          "producto": {
+            "name": "Aceite Capilar",
+            "brand": "Farmatodo",
+            "variants": [
+              {
+                "type": "flavor",
+                "value": "Manzanilla"
+              }
+            ]
+          }
+        },
+        {
+          "product_code": "116084541",
+          "description": "Maquina Afeitar Gillette Pb (G)",
+          "quantity": 1,
+          "unit_type": "Unidad",
+          "notes": null,
+          "total_usd_bcv": 16.77,
+          "total_usd_binance": 16.77,
+          "total_ves": 983.4,
+          "category_1": "Cuidado Personal",
+          "category_2": "Afeitado y Depilación",
+          "producto": {
+            "name": "Maquina Afeitar",
+            "brand": "Gillette",
+            "variants": [
+              {
+                "type": "version",
+                "value": "Prestobarba"
+              }
+            ]
+          }
+        }
+      ],
+      "subtotal_usd_bcv": 152.41,
+      "subtotal_usd_binance": 152.41
+    }
+  }
+]
