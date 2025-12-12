@@ -1,8 +1,9 @@
 from django.contrib import admin
 from django.urls import path, include
-from django.http import JsonResponse
+from django.http import JsonResponse, FileResponse
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.decorators.cache import cache_control
 from products.views import get_products_by_categories
 from exchange_rates.views import chart_view
 from config.backup_views import download_database_backup
@@ -21,8 +22,14 @@ def api_status(request):
         }
     })
 
+@cache_control(max_age=0, no_cache=True, no_store=True, must_revalidate=True)
+def service_worker(request):
+    sw_path = settings.BASE_DIR / 'static' / 'pwa' / 'service-worker.js'
+    return FileResponse(open(sw_path, 'rb'), content_type='application/javascript')
+
 urlpatterns = [
     path('', chart_view, name='home'),
+    path('service-worker.js', service_worker, name='service-worker'),
     path('api/status/', api_status, name='api_status'),
     path('admin/', admin.site.urls),
     path('image-processor/', include('image_processor.urls')),
