@@ -30,28 +30,31 @@
     <div x-show="stats.bcv && stats.binance" class="mb-6 space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-4">
         <!-- Calculator -->
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-4 card">
-            <div class="flex items-center gap-1.5 mb-3">
-                <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
-                <span class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Calculadora</span>
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-1.5">
+                    <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+                    <span class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Calculadora</span>
+                </div>
+                <a href="bnc://app.binance.com" class="text-[10px] text-orange-500 hover:text-orange-600 hover:underline">Abrir Binance</a>
             </div>
-            <div class="grid grid-cols-2 gap-2 md:gap-3">
+            <div class="grid grid-cols-3 gap-2 md:gap-3">
                 <div>
                     <label class="text-[10px] text-gray-500 mb-1 block uppercase tracking-wide">USD (BCV)</label>
                     <input type="text" inputmode="decimal" x-model="bcvAmount" @input="calculateFromBcv()"
                         placeholder="100"
-                        class="w-full px-2 py-1.5 md:px-3 md:py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                        class="w-full px-2 py-1.5 md:px-3 md:py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm font-semibold text-blue-700 placeholder-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 </div>
                 <div>
                     <label class="text-[10px] text-gray-500 mb-1 block uppercase tracking-wide">USD (Binance)</label>
                     <input type="text" inputmode="decimal" x-model="binanceAmount" @input="calculateFromBinance()"
                         :placeholder="stats.bcv?.current && stats.binance?.current ? (100 * stats.bcv.current / stats.binance.current).toFixed(2) : ''"
-                        class="w-full px-2 py-1.5 md:px-3 md:py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                        class="w-full px-2 py-1.5 md:px-3 md:py-2 bg-orange-50 border border-orange-200 rounded-lg text-sm font-semibold text-orange-700 placeholder-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent">
                 </div>
-            </div>
-            <div x-show="bcvAmount || binanceAmount" class="mt-2 pt-2 border-t border-gray-100">
-                <div class="flex items-center justify-between">
-                    <span class="text-xs text-gray-500">Bolívares:</span>
-                    <span class="text-sm font-bold text-emerald-600" x-text="bsEquivalent"></span>
+                <div>
+                    <label class="text-[10px] text-gray-500 mb-1 block uppercase tracking-wide">Bolívares</label>
+                    <input type="text" inputmode="decimal" x-model="bsAmount" @input="calculateFromBs()"
+                        :placeholder="stats.bcv?.current ? (100 * stats.bcv.current).toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''"
+                        class="w-full px-2 py-1.5 md:px-3 md:py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-sm font-semibold text-emerald-700 placeholder-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
                 </div>
             </div>
         </div>
@@ -359,7 +362,7 @@ function chartApp() {
         stats: { bcv: null, binance: null, spread: null, spreadPercent: null, spreadStats: null },
         bcvAmount: '',
         binanceAmount: '',
-        bsEquivalent: '',
+        bsAmount: '',
         lastBinanceDate: null,
 
         init() {
@@ -367,30 +370,52 @@ function chartApp() {
             setInterval(() => this.fetchData(), 300000);
         },
 
+        parseNumber(str) {
+            if (!str) return NaN;
+            // Remove thousand separators (.) and convert decimal comma to dot
+            return parseFloat(str.replace(/\./g, '').replace(',', '.'));
+        },
+
+        formatBsWithThousands(value) {
+            return value.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        },
+
         calculateFromBcv() {
             if (!this.stats.bcv || !this.stats.binance || !this.bcvAmount) {
                 this.binanceAmount = '';
-                this.bsEquivalent = '';
+                this.bsAmount = '';
                 return;
             }
-            const bsTotal = parseFloat(this.bcvAmount) * this.stats.bcv.current;
+            const bcvVal = this.parseNumber(this.bcvAmount);
+            if (isNaN(bcvVal)) return;
+            const bsTotal = bcvVal * this.stats.bcv.current;
             this.binanceAmount = (bsTotal / this.stats.binance.current).toFixed(2);
-            this.bsEquivalent = this.formatBs(bsTotal);
+            this.bsAmount = this.formatBsWithThousands(bsTotal);
         },
 
         calculateFromBinance() {
             if (!this.stats.bcv || !this.stats.binance || !this.binanceAmount) {
                 this.bcvAmount = '';
-                this.bsEquivalent = '';
+                this.bsAmount = '';
                 return;
             }
-            const bsTotal = parseFloat(this.binanceAmount) * this.stats.binance.current;
+            const binanceVal = this.parseNumber(this.binanceAmount);
+            if (isNaN(binanceVal)) return;
+            const bsTotal = binanceVal * this.stats.binance.current;
             this.bcvAmount = (bsTotal / this.stats.bcv.current).toFixed(2);
-            this.bsEquivalent = this.formatBs(bsTotal);
+            this.bsAmount = this.formatBsWithThousands(bsTotal);
         },
 
-        formatBs(value) {
-            return value.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Bs';
+        calculateFromBs() {
+            if (!this.stats.bcv || !this.stats.binance || !this.bsAmount) {
+                this.bcvAmount = '';
+                this.binanceAmount = '';
+                return;
+            }
+            const bsVal = this.parseNumber(this.bsAmount);
+            if (isNaN(bsVal)) return;
+            this.bcvAmount = (bsVal / this.stats.bcv.current).toFixed(2);
+            this.binanceAmount = (bsVal / this.stats.binance.current).toFixed(2);
         },
 
         async fetchData() {
