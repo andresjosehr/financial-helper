@@ -26,118 +26,219 @@
 
 {% block content %}
 <div x-data="chartApp()">
-    <!-- Metrics Grid -->
-    <div x-show="stats.bcv && stats.binance" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-
-        <!-- BCV Rate -->
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 card">
-            <div class="flex items-center justify-between mb-3">
-                <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">BCV Oficial</span>
-                <div class="w-2 h-2 rounded-full bg-blue-500"></div>
+    <!-- Metrics Grid - Mobile First, Desktop Row -->
+    <div x-show="stats.bcv && stats.binance" class="mb-6 space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-4">
+        <!-- Calculator -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-4 card">
+            <div class="flex items-center gap-1.5 mb-3">
+                <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+                <span class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Calculadora</span>
             </div>
-            <div class="text-3xl font-bold text-gray-900 mb-1" x-text="formatRate(stats.bcv?.current)"></div>
-            <div class="text-xs text-gray-500">Bs/USD</div>
-        </div>
-
-        <!-- Binance Rate -->
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 card">
-            <div class="flex items-center justify-between mb-3">
-                <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Binance P2P</span>
-                <div class="w-2 h-2 rounded-full bg-orange-500"></div>
-            </div>
-            <div class="text-3xl font-bold text-gray-900 mb-1" x-text="formatRate(stats.binance?.current)"></div>
-            <div class="text-xs text-gray-500">Bs/USD</div>
-        </div>
-
-        <!-- Calculator Quick -->
-        <div class="bg-gradient-to-br from-emerald-600 to-teal-600 rounded-lg shadow-sm p-4 card text-white">
-            <div class="text-xs font-semibold uppercase tracking-wide mb-3 opacity-90">Calculadora Bidireccional</div>
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid grid-cols-2 gap-2 md:gap-3">
                 <div>
-                    <label class="text-[10px] opacity-75 mb-1 block uppercase tracking-wide">BCV</label>
-                    <input type="number" x-model="bcvAmount" @input="calculateFromBcv()" placeholder="100"
-                        class="w-full px-3 py-1.5 bg-white/20 border border-white/30 rounded text-sm font-semibold text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50">
+                    <label class="text-[10px] text-gray-500 mb-1 block uppercase tracking-wide">USD (BCV)</label>
+                    <input type="text" inputmode="decimal" x-model="bcvAmount" @input="calculateFromBcv()"
+                        placeholder="100"
+                        class="w-full px-2 py-1.5 md:px-3 md:py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
                 </div>
                 <div>
-                    <label class="text-[10px] opacity-75 mb-1 block uppercase tracking-wide">Binance</label>
-                    <input type="number" x-model="binanceAmount" @input="calculateFromBinance()" placeholder="100"
-                        class="w-full px-3 py-1.5 bg-white/20 border border-white/30 rounded text-sm font-semibold text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50">
+                    <label class="text-[10px] text-gray-500 mb-1 block uppercase tracking-wide">USD (Binance)</label>
+                    <input type="text" inputmode="decimal" x-model="binanceAmount" @input="calculateFromBinance()"
+                        :placeholder="stats.bcv?.current && stats.binance?.current ? (100 * stats.bcv.current / stats.binance.current).toFixed(2) : ''"
+                        class="w-full px-2 py-1.5 md:px-3 md:py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
                 </div>
             </div>
-            <div class="text-[10px] opacity-75 mt-2 text-center">USD equivalentes según tasas actuales</div>
+            <div x-show="bcvAmount || binanceAmount" class="mt-2 pt-2 border-t border-gray-100">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs text-gray-500">Bolívares:</span>
+                    <span class="text-sm font-bold text-emerald-600" x-text="bsEquivalent"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rates Card - Desktop (BCV + Binance together) -->
+        <div class="hidden md:block bg-white rounded-lg shadow-sm border border-gray-200 p-4 card">
+            <div class="flex items-center gap-1.5 mb-3">
+                <div class="w-2 h-2 rounded-full bg-gray-400"></div>
+                <span class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Tasas Actuales</span>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="text-center p-3 bg-blue-50 rounded-lg">
+                    <div class="text-[10px] font-semibold text-blue-600 uppercase tracking-wide mb-1">BCV Oficial</div>
+                    <div class="text-2xl font-bold text-blue-600" x-text="formatRate(stats.bcv?.current)"></div>
+                </div>
+                <div class="text-center p-3 bg-orange-50 rounded-lg">
+                    <div class="text-[10px] font-semibold text-orange-600 uppercase tracking-wide mb-1">Binance P2P</div>
+                    <div class="text-2xl font-bold text-orange-500" x-text="formatRate(stats.binance?.current)"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Only: Rates Row -->
+        <div class="md:hidden grid grid-cols-2 gap-3">
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-3 card">
+                <div class="flex items-center gap-1.5 mb-1">
+                    <div class="w-2 h-2 rounded-full bg-blue-500"></div>
+                    <span class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">BCV</span>
+                </div>
+                <div class="text-xl font-bold text-blue-600" x-text="formatRate(stats.bcv?.current)"></div>
+            </div>
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-3 card">
+                <div class="flex items-center gap-1.5 mb-1">
+                    <div class="w-2 h-2 rounded-full bg-orange-500"></div>
+                    <span class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Binance</span>
+                </div>
+                <div class="text-xl font-bold text-orange-500" x-text="formatRate(stats.binance?.current)"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Spread Stats - Mobile (Gauge Semicircular) -->
+    <div x-show="stats.spreadStats" class="md:hidden bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+        <div class="mb-3">
+            <h3 class="text-sm font-bold text-gray-900">Indicador de Spread</h3>
+            <p class="text-xs text-gray-500 mt-0.5">Spread actual vs. bandas históricas</p>
+        </div>
+        <div class="flex flex-col items-center">
+            <!-- Gauge SVG -->
+            <div class="relative w-full max-w-xs">
+                <svg viewBox="0 0 300 170" class="w-full h-auto overflow-visible">
+                    <defs>
+                        <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color:#ef4444"/>
+                            <stop offset="33%" style="stop-color:#f59e0b"/>
+                            <stop offset="66%" style="stop-color:#84cc16"/>
+                            <stop offset="100%" style="stop-color:#22c55e"/>
+                        </linearGradient>
+                    </defs>
+                    <path d="M 20 140 A 130 130 0 0 1 280 140" fill="none" stroke="#e5e7eb" stroke-width="18" stroke-linecap="round"/>
+                    <path d="M 20 140 A 130 130 0 0 1 280 140" fill="none" stroke="url(#gaugeGradient)" stroke-width="18" stroke-linecap="round"/>
+                    <line x1="62" y1="48" x2="72" y2="60" stroke="white" stroke-width="3" stroke-linecap="round"/>
+                    <line x1="150" y1="10" x2="150" y2="25" stroke="white" stroke-width="3" stroke-linecap="round"/>
+                    <line x1="238" y1="48" x2="228" y2="60" stroke="white" stroke-width="3" stroke-linecap="round"/>
+                    <text x="62" y="105" font-size="10" fill="#ef4444" font-weight="600" text-anchor="middle" transform="rotate(-60 62 105)">Bajo</text>
+                    <text x="105" y="45" font-size="10" fill="#f59e0b" font-weight="600" text-anchor="middle" transform="rotate(-25 105 45)">Bueno</text>
+                    <text x="195" y="45" font-size="10" fill="#84cc16" font-weight="600" text-anchor="middle" transform="rotate(25 195 45)">Excelente</text>
+                    <text x="238" y="105" font-size="10" fill="#22c55e" font-weight="600" text-anchor="middle" transform="rotate(60 238 105)">Máximo</text>
+                    <g :transform="'rotate(' + getGaugeRotation() + ' 150 140)'">
+                        <polygon points="150,35 145,140 155,140" fill="#1e1b4b"/>
+                        <circle cx="150" cy="140" r="12" fill="#1e1b4b"/>
+                        <circle cx="150" cy="140" r="6" fill="white"/>
+                    </g>
+                </svg>
+            </div>
+            <!-- Spread Card debajo del gauge -->
+            <div class="mt-4 w-full max-w-xs rounded-lg border p-3"
+                :class="{
+                    'bg-red-50 border-red-200': getSpreadIndicator() === 'low',
+                    'bg-amber-50 border-amber-200': getSpreadIndicator() === 'medium',
+                    'bg-emerald-50 border-emerald-200': getSpreadIndicator() === 'high',
+                    'bg-blue-50 border-blue-200': getSpreadIndicator() === 'max'
+                }">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="text-2xl font-bold"
+                            :class="{
+                                'text-red-600': getSpreadIndicator() === 'low',
+                                'text-amber-600': getSpreadIndicator() === 'medium',
+                                'text-emerald-600': getSpreadIndicator() === 'high',
+                                'text-blue-600': getSpreadIndicator() === 'max'
+                            }"
+                            x-text="formatPercentage(stats.spreadPercent)"></div>
+                        <div>
+                            <div class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Spread</div>
+                            <div class="text-xs font-bold uppercase"
+                                :class="{
+                                    'text-red-600': getSpreadIndicator() === 'low',
+                                    'text-amber-600': getSpreadIndicator() === 'medium',
+                                    'text-emerald-600': getSpreadIndicator() === 'high',
+                                    'text-blue-600': getSpreadIndicator() === 'max'
+                                }"
+                                x-text="getSpreadIndicator() === 'high' ? 'Excelente' : getSpreadIndicator() === 'medium' ? 'Bueno' : getSpreadIndicator() === 'max' ? 'Máximo' : 'Bajo'">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex gap-1">
+                        <div class="w-2 h-6 rounded-full" :class="getSpreadIndicator() === 'low' ? 'bg-red-500' : 'bg-gray-200'"></div>
+                        <div class="w-2 h-6 rounded-full" :class="getSpreadIndicator() === 'medium' || getSpreadIndicator() === 'high' || getSpreadIndicator() === 'max' ? 'bg-amber-500' : 'bg-gray-200'"></div>
+                        <div class="w-2 h-6 rounded-full" :class="getSpreadIndicator() === 'high' || getSpreadIndicator() === 'max' ? 'bg-emerald-500' : 'bg-gray-200'"></div>
+                        <div class="w-2 h-6 rounded-full" :class="getSpreadIndicator() === 'max' ? 'bg-blue-500' : 'bg-gray-200'"></div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Spread Stats (Indicador Visual) -->
-    <div x-show="stats.spreadStats" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-        <div class="mb-6">
-            <h3 class="text-sm font-bold text-gray-900">Indicador de Spread Actual</h3>
-            <p class="text-xs text-gray-500 mt-1">Spread actual comparado con bandas históricas (excluyendo datos de hoy).</p>
+    <!-- Spread Stats - Desktop (Slider Horizontal) -->
+    <div x-show="stats.spreadStats" class="hidden md:block bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <div class="mb-4">
+            <h3 class="text-sm font-bold text-gray-900">Indicador de Spread</h3>
+            <p class="text-xs text-gray-500 mt-1">Spread actual comparado con bandas históricas</p>
         </div>
 
-        <div class="relative px-2">
-            <div class="relative h-8 mb-0.5">
+        <div class="relative px-4">
+            <!-- Indicador actual y promedio encima de la barra -->
+            <div class="relative h-12 mb-1">
                 <div class="absolute bottom-0 transform -translate-x-1/2 z-30"
                     :style="'left: ' + Math.min(100, Math.max(0, ((stats.spreadPercent - (stats.spreadStats?.min || 0)) / ((stats.spreadStats?.max || 100) - (stats.spreadStats?.min || 0))) * 100)) + '%'">
                     <div class="text-center">
-                        <div class="text-xs font-bold text-indigo-700 leading-none mb-0.5" x-text="formatPercentage(stats.spreadPercent)"></div>
-                        <div class="text-[8px] font-bold uppercase px-1 py-px rounded-full inline-block leading-none"
+                        <div class="text-sm font-bold leading-none mb-1"
                             :class="{
-                                'bg-green-100 text-green-700': getSpreadIndicator() === 'high',
-                                'bg-amber-100 text-amber-700': getSpreadIndicator() === 'medium',
-                                'bg-red-100 text-red-700': getSpreadIndicator() === 'low'
+                                'text-red-600': getSpreadIndicator() === 'low',
+                                'text-amber-600': getSpreadIndicator() === 'medium',
+                                'text-emerald-600': getSpreadIndicator() === 'high',
+                                'text-green-600': getSpreadIndicator() === 'max'
                             }"
-                            x-text="getSpreadIndicator() === 'high' ? 'EXCELENTE' : getSpreadIndicator() === 'medium' ? 'BUENO' : 'BAJO'">
+                            x-text="formatPercentage(stats.spreadPercent)"></div>
+                        <div class="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full inline-block leading-none"
+                            :class="{
+                                'bg-red-100 text-red-700': getSpreadIndicator() === 'low',
+                                'bg-amber-100 text-amber-700': getSpreadIndicator() === 'medium',
+                                'bg-emerald-100 text-emerald-700': getSpreadIndicator() === 'high',
+                                'bg-green-100 text-green-700': getSpreadIndicator() === 'max'
+                            }"
+                            x-text="getSpreadIndicator() === 'high' ? 'EXCELENTE' : getSpreadIndicator() === 'medium' ? 'BUENO' : getSpreadIndicator() === 'max' ? 'MÁXIMO' : 'BAJO'">
                         </div>
                     </div>
-                    <div class="w-px h-3 bg-indigo-600 mx-auto mt-0.5"></div>
-                </div>
-
-                <div x-show="stats.spreadStats?.avg" class="absolute bottom-0 transform -translate-x-1/2 z-20"
-                    :style="'left: ' + Math.min(100, Math.max(0, ((stats.spreadStats?.avg - (stats.spreadStats?.min || 0)) / ((stats.spreadStats?.max || 100) - (stats.spreadStats?.min || 0))) * 100)) + '%'">
-                    <div class="text-center">
-                        <div class="text-xs font-bold text-amber-600 leading-none mb-0.5" x-text="formatPercentage(stats.spreadStats?.avg)"></div>
-                        <div class="text-[8px] font-medium uppercase px-1 py-px bg-amber-50 text-amber-700 rounded-full inline-block leading-none">PROMEDIO</div>
-                    </div>
-                    <div class="w-px h-3 bg-amber-500 mx-auto mt-0.5"></div>
+                    <div class="w-0.5 h-3 bg-gray-800 mx-auto mt-1"></div>
                 </div>
             </div>
 
-            <div class="relative h-3 bg-gradient-to-r from-red-500 via-amber-500 via-lime-500 to-green-500 rounded-full shadow-sm">
-                <div class="absolute transform -translate-x-1/2 -translate-y-[3px] z-20"
+            <!-- Barra de gradiente -->
+            <div class="relative h-4 bg-gradient-to-r from-red-500 via-amber-500 via-65% to-green-500 rounded-full shadow-inner">
+                <div class="absolute transform -translate-x-1/2 -translate-y-1 z-20"
                     :style="'left: ' + Math.min(100, Math.max(0, ((stats.spreadPercent - (stats.spreadStats?.min || 0)) / ((stats.spreadStats?.max || 100) - (stats.spreadStats?.min || 0))) * 100)) + '%'">
-                    <div class="absolute inset-0 w-5 h-5 bg-indigo-400 rounded-full opacity-30 animate-ping"></div>
-                    <div class="relative w-5 h-5 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-full shadow-lg border-2 border-white"></div>
+                    <div class="w-6 h-6 bg-white rounded-full shadow-lg border-2 border-gray-800 flex items-center justify-center">
+                        <div class="w-2 h-2 rounded-full bg-gray-800"></div>
+                    </div>
                 </div>
             </div>
 
-            <div class="relative h-10 mt-3">
+            <!-- Labels debajo -->
+            <div class="relative h-12 mt-2">
                 <div class="absolute transform -translate-x-1/2" style="left: 0%">
-                    <div class="w-px h-4 bg-red-400 mx-auto"></div>
-                    <div class="text-center mt-1 min-w-max">
+                    <div class="text-center">
                         <div class="text-xs font-bold text-red-600" x-text="formatPercentage(stats.spreadStats?.min)"></div>
-                        <div class="text-[10px] font-medium text-gray-400 uppercase">Bajo</div>
+                        <div class="text-[10px] text-gray-400">Bajo</div>
                     </div>
                 </div>
                 <div class="absolute transform -translate-x-1/2" :style="'left: ' + ((stats.spreadStats?.avg - stats.spreadStats?.min) / (stats.spreadStats?.max - stats.spreadStats?.min) * 100) + '%'">
-                    <div class="w-px h-4 bg-amber-400 mx-auto"></div>
-                    <div class="text-center mt-1 min-w-max">
+                    <div class="text-center">
                         <div class="text-xs font-bold text-amber-600" x-text="formatPercentage(stats.spreadStats?.avg)"></div>
-                        <div class="text-[10px] font-medium text-gray-400 uppercase">Bueno</div>
+                        <div class="text-[10px] text-gray-400">Bueno</div>
                     </div>
                 </div>
                 <div class="absolute transform -translate-x-1/2" :style="'left: ' + ((stats.spreadStats?.p75 - stats.spreadStats?.min) / (stats.spreadStats?.max - stats.spreadStats?.min) * 100) + '%'">
-                    <div class="w-px h-4 bg-lime-400 mx-auto"></div>
-                    <div class="text-center mt-1 min-w-max">
+                    <div class="text-center">
                         <div class="text-xs font-bold text-lime-600" x-text="formatPercentage(stats.spreadStats?.p75)"></div>
-                        <div class="text-[10px] font-medium text-gray-400 uppercase">Excelente</div>
+                        <div class="text-[10px] text-gray-400">Excelente</div>
                     </div>
                 </div>
                 <div class="absolute transform -translate-x-1/2" style="left: 100%">
-                    <div class="w-px h-4 bg-green-400 mx-auto"></div>
-                    <div class="text-center mt-1 min-w-max">
+                    <div class="text-center">
                         <div class="text-xs font-bold text-green-600" x-text="formatPercentage(stats.spreadStats?.max)"></div>
-                        <div class="text-[10px] font-medium text-gray-400 uppercase">Máximo</div>
+                        <div class="text-[10px] text-gray-400">Máximo</div>
                     </div>
                 </div>
             </div>
@@ -256,8 +357,9 @@ function chartApp() {
         error: null,
         charts: { bcvRate: null, binanceRate: null, spreadDual: null, volatility: null, distribution: null },
         stats: { bcv: null, binance: null, spread: null, spreadPercent: null, spreadStats: null },
-        bcvAmount: 100,
-        binanceAmount: 0,
+        bcvAmount: '',
+        binanceAmount: '',
+        bsEquivalent: '',
         lastBinanceDate: null,
 
         init() {
@@ -266,15 +368,29 @@ function chartApp() {
         },
 
         calculateFromBcv() {
-            if (!this.stats.bcv || !this.stats.binance || !this.bcvAmount) { this.binanceAmount = ''; return; }
+            if (!this.stats.bcv || !this.stats.binance || !this.bcvAmount) {
+                this.binanceAmount = '';
+                this.bsEquivalent = '';
+                return;
+            }
             const bsTotal = parseFloat(this.bcvAmount) * this.stats.bcv.current;
             this.binanceAmount = (bsTotal / this.stats.binance.current).toFixed(2);
+            this.bsEquivalent = this.formatBs(bsTotal);
         },
 
         calculateFromBinance() {
-            if (!this.stats.bcv || !this.stats.binance || !this.binanceAmount) { this.bcvAmount = ''; return; }
+            if (!this.stats.bcv || !this.stats.binance || !this.binanceAmount) {
+                this.bcvAmount = '';
+                this.bsEquivalent = '';
+                return;
+            }
             const bsTotal = parseFloat(this.binanceAmount) * this.stats.binance.current;
             this.bcvAmount = (bsTotal / this.stats.bcv.current).toFixed(2);
+            this.bsEquivalent = this.formatBs(bsTotal);
+        },
+
+        formatBs(value) {
+            return value.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Bs';
         },
 
         async fetchData() {
@@ -286,7 +402,6 @@ function chartApp() {
                 if (data.bcv.length === 0 && data.binance_sell.length === 0) { this.error = 'No hay datos'; this.loading = false; return; }
                 this.calculateStats(data.bcv, data.binance_sell, data.bands);
                 this.lastBinanceDate = data.binance_sell.length > 0 ? data.binance_sell[data.binance_sell.length - 1].timestamp : null;
-                this.calculateFromBcv();
                 this.renderAllCharts(data.bcv, data.binance_sell);
             } catch (err) { this.error = err.message; } finally { this.loading = false; }
         },
@@ -486,7 +601,21 @@ function chartApp() {
         getSpreadIndicator() {
             if (!this.stats.spreadStats || !this.stats.spreadPercent) return 'low';
             const c = this.stats.spreadPercent;
-            return c >= this.stats.spreadStats.p75 ? 'high' : c >= this.stats.spreadStats.avg ? 'medium' : 'low';
+            const maxThreshold = this.stats.spreadStats.max - (this.stats.spreadStats.max - this.stats.spreadStats.p75) * 0.2;
+            if (c >= maxThreshold) return 'max';
+            if (c >= this.stats.spreadStats.p75) return 'high';
+            if (c >= this.stats.spreadStats.avg) return 'medium';
+            return 'low';
+        },
+
+        getGaugeRotation() {
+            if (!this.stats.spreadStats || this.stats.spreadPercent == null) return -90;
+            const min = this.stats.spreadStats.min;
+            const max = this.stats.spreadStats.max;
+            const current = this.stats.spreadPercent;
+            const percent = Math.min(1, Math.max(0, (current - min) / (max - min)));
+            // Rotación de -90° (izquierda) a 90° (derecha)
+            return -90 + (percent * 180);
         }
     }
 }
