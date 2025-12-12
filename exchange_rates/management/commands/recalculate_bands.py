@@ -24,8 +24,8 @@ class Command(BaseCommand):
         parser.add_argument(
             '--days',
             type=int,
-            default=5,
-            help='Número de días para calcular las bandas (default: 5)'
+            default=3,
+            help='Número de días para calcular las bandas (default: 3)'
         )
 
     def handle(self, *args, **options):

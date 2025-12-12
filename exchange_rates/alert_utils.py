@@ -234,7 +234,7 @@ def update_alert_state_bands(force=False):
         return False
 
     # Calcular nuevas bandas
-    spreads = calculate_historical_spreads(days=5, exclude_today=True)
+    spreads = calculate_historical_spreads(days=3, exclude_today=True)
     bands = calculate_spread_bands(spreads)
 
     if not bands:
