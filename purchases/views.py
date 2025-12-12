@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from django.shortcuts import render, get_object_or_404, redirect
 from django.db.models import Sum, Q
@@ -265,6 +266,41 @@ def update_purchase_rates(request, pk):
                 'total_usd_binance': float(purchase.total_usd_binance) if purchase.total_usd_binance else None,
             },
             'items': items_data
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'JSON inválido'}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def update_purchase_date(request, pk):
+    """API para actualizar la fecha de la compra."""
+    try:
+        purchase = get_object_or_404(Purchase, pk=pk, user=request.user)
+        data = json.loads(request.body)
+
+        purchase_date = data.get('purchase_date')
+
+        if not purchase_date:
+            return JsonResponse({'success': False, 'error': 'Se requiere purchase_date'}, status=400)
+
+        try:
+            # Parsear la fecha en formato YYYY-MM-DD
+            parsed_date = datetime.strptime(purchase_date, '%Y-%m-%d').date()
+            purchase.purchase_date = parsed_date
+            purchase.save()
+        except ValueError:
+            return JsonResponse({'success': False, 'error': 'Formato de fecha inválido. Use YYYY-MM-DD'}, status=400)
+
+        return JsonResponse({
+            'success': True,
+            'purchase': {
+                'purchase_date': purchase.purchase_date.strftime('%Y-%m-%d'),
+            }
         })
 
     except json.JSONDecodeError:

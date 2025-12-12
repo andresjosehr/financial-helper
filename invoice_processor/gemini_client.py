@@ -120,7 +120,12 @@ INSTRUCCIONES CRÍTICAS:
 1. purchase_items DEBE ser un ARRAY de objetos
 2. Cada producto es un objeto SEPARADO con llaves {}
 3. Convierte montos correctamente: "Bs8.935,57" → 8935.57
-4. Fechas en formato YYYY-MM-DD
+4. FECHAS - MUY IMPORTANTE:
+   - Las facturas venezolanas usan formato DD-MM-YYYY o DD/MM/YYYY (día primero, luego mes, luego año)
+   - Ejemplos: "07-12-2025" significa 7 de diciembre de 2025, "15/03/2025" significa 15 de marzo de 2025
+   - NUNCA interpretes como formato americano (MM-DD-YYYY)
+   - En el JSON de salida, convierte SIEMPRE a formato YYYY-MM-DD (ISO)
+   - Ejemplo: "07-12-2025" en factura → "2025-12-07" en JSON
 5. SIEMPRE deja bcv_rate, binance_rate, total_usd_bcv, total_usd_binance en null
 6. El impuesto SIEMPRE es 16%
 
@@ -324,7 +329,12 @@ INSTRUCCIONES:
 1. Extrae SOLO la información visible
 2. Si un campo no está presente, usa null
 3. Valores numéricos deben ser números, no strings
-4. Fechas en formato YYYY-MM-DD
+4. FECHAS - MUY IMPORTANTE:
+   - Las facturas venezolanas usan formato DD-MM-YYYY o DD/MM/YYYY (día primero, luego mes, luego año)
+   - Ejemplos: "07-12-2025" significa 7 de diciembre de 2025, "15/03/2025" significa 15 de marzo de 2025
+   - NUNCA interpretes como formato americano (MM-DD-YYYY)
+   - En el JSON de salida, convierte SIEMPRE a formato YYYY-MM-DD (ISO)
+   - Ejemplo: "07-12-2025" en factura → "2025-12-07" en JSON
 5. Convierte montos correctamente (Ej: "Bs8.935,57" → 8935.57)
 6. Presta especial atención a los montos totales
 

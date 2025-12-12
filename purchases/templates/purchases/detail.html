@@ -36,7 +36,12 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                         </svg>
-                        {{ purchase.purchase_date|date:"d M Y" }}
+                        <input
+                            type="date"
+                            x-model="purchaseDate"
+                            @change="updateDate()"
+                            class="text-xs sm:text-sm text-gray-500 border border-transparent hover:border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded px-1 py-0.5 transition-colors bg-transparent cursor-pointer"
+                        >
                     </div>
                     {% if purchase.purchase_time %}
                     <div class="flex items-center gap-1">
@@ -351,6 +356,7 @@ function purchaseEditor() {
         purchaseId: '{{ purchase.id }}',
         bcvRate: {{ purchase.bcv_rate|default:"0" }},
         binanceRate: {{ purchase.binance_rate|default:"0" }},
+        purchaseDate: '{{ purchase.purchase_date|date:"Y-m-d" }}',
         saveStatus: null,
         saveTimeout: null,
         showDeleteModal: false,
@@ -478,6 +484,35 @@ function purchaseEditor() {
                 }
             } catch (error) {
                 console.error('Error updating rate:', error);
+                this.showStatus('error');
+            }
+        },
+
+        async updateDate() {
+            this.showStatus('saving');
+
+            try {
+                const response = await fetch(`/purchases/${this.purchaseId}/update-date/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        purchase_date: this.purchaseDate
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    this.purchaseDate = data.purchase.purchase_date;
+                    this.showStatus('saved');
+                } else {
+                    console.error('Error updating date:', data.error);
+                    this.showStatus('error');
+                }
+            } catch (error) {
+                console.error('Error updating date:', error);
                 this.showStatus('error');
             }
         },
