@@ -53,7 +53,7 @@
                 <div>
                     <label class="text-[10px] text-gray-500 mb-1 block uppercase tracking-wide">Bolívares</label>
                     <input type="text" inputmode="decimal" x-model="bsAmount" @input="calculateFromBs()"
-                        :placeholder="stats.bcv?.current ? (100 * stats.bcv.current).toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''"
+                        :placeholder="stats.bcv?.current ? (100 * stats.bcv.current).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''"
                         class="w-full px-2 py-1.5 md:px-3 md:py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-sm font-semibold text-emerald-700 placeholder-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
                 </div>
             </div>
@@ -372,12 +372,36 @@ function chartApp() {
 
         parseNumber(str) {
             if (!str) return NaN;
-            // Remove thousand separators (.) and convert decimal comma to dot
-            return parseFloat(str.replace(/\./g, '').replace(',', '.'));
+            const cleaned = str.replace(/\s/g, '');
+            // Si tiene ambos punto y coma, el último es el decimal
+            if (cleaned.includes('.') && cleaned.includes(',')) {
+                const lastDot = cleaned.lastIndexOf('.');
+                const lastComma = cleaned.lastIndexOf(',');
+                if (lastComma > lastDot) {
+                    // Formato venezolano: 1.234,56
+                    return parseFloat(cleaned.replace(/\./g, '').replace(',', '.'));
+                } else {
+                    // Formato internacional: 1,234.56
+                    return parseFloat(cleaned.replace(/,/g, ''));
+                }
+            }
+            // Solo coma: puede ser decimal (1234,56) o miles (1,234)
+            if (cleaned.includes(',')) {
+                const parts = cleaned.split(',');
+                // Si la parte después de la coma tiene 3 dígitos, es separador de miles
+                if (parts.length === 2 && parts[1].length === 3 && /^\d+$/.test(parts[1])) {
+                    return parseFloat(cleaned.replace(/,/g, ''));
+                }
+                // Si no, es decimal
+                return parseFloat(cleaned.replace(',', '.'));
+            }
+            // Solo punto: es decimal
+            return parseFloat(cleaned);
         },
 
         formatBsWithThousands(value) {
-            return value.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            // Formato internacional: coma = miles, punto = decimal
+            return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         },
 
         calculateFromBcv() {
