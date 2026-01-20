@@ -26,6 +26,52 @@
 
 {% block content %}
 <div x-data="chartApp()">
+    <!-- Date Range Selector -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <!-- Quick Range Buttons -->
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide mr-1">Rango:</span>
+                <template x-for="range in quickRanges" :key="range.days">
+                    <button @click="setQuickRange(range.days)"
+                        :class="{'bg-indigo-600 text-white': days === range.days && !customRange, 'bg-gray-100 text-gray-700 hover:bg-gray-200': days !== range.days || customRange}"
+                        class="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
+                        x-text="range.label">
+                    </button>
+                </template>
+            </div>
+
+            <!-- Custom Date Range -->
+            <div class="flex flex-wrap items-center gap-2">
+                <div class="flex items-center gap-2">
+                    <label class="text-xs text-gray-500">Desde:</label>
+                    <input type="date" x-model="startDate" @change="applyCustomRange()"
+                        :max="endDate"
+                        class="px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="text-xs text-gray-500">Hasta:</label>
+                    <input type="date" x-model="endDate" @change="applyCustomRange()"
+                        :min="startDate"
+                        :max="today"
+                        class="px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                </div>
+            </div>
+        </div>
+
+        <!-- Range Info -->
+        <div class="mt-3 flex items-center justify-between text-xs text-gray-500">
+            <span x-text="'Mostrando ' + days + ' días de datos'"></span>
+            <span x-show="loading" class="flex items-center gap-1">
+                <svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Cargando...
+            </span>
+        </div>
+    </div>
+
     <!-- Metrics Grid - Mobile First, Desktop Row -->
     <div x-show="stats.bcv && stats.binance" class="mb-6 space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-4">
         <!-- Calculator -->
@@ -256,10 +302,18 @@
             <div class="px-5 py-4 border-b border-gray-200">
                 <div class="flex items-center justify-between mb-2">
                     <h2 class="text-base font-bold text-gray-900">Spread Porcentual</h2>
-                    <div class="flex items-center gap-3 text-xs font-medium">
-                        <div class="flex items-center gap-1.5"><div class="w-3 h-0.5 bg-purple-600 rounded-full"></div><span class="text-gray-600">Spread %</span></div>
-                        <div class="flex items-center gap-1.5"><div class="w-3 h-0.5 bg-amber-500 rounded-full"></div><span class="text-gray-600">Media</span></div>
-                        <div class="flex items-center gap-1.5"><div class="w-3 h-0.5 bg-emerald-600 rounded-full"></div><span class="text-gray-600">P75</span></div>
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-3 text-xs font-medium">
+                            <div class="flex items-center gap-1.5"><div class="w-3 h-0.5 bg-purple-600 rounded-full"></div><span class="text-gray-600">Spread %</span></div>
+                            <div class="flex items-center gap-1.5"><div class="w-3 h-0.5 bg-amber-500 rounded-full"></div><span class="text-gray-600">Media</span></div>
+                            <div class="flex items-center gap-1.5"><div class="w-3 h-0.5 bg-emerald-600 rounded-full"></div><span class="text-gray-600">P75</span></div>
+                        </div>
+                        <button @click="openFullscreen('spreadDual', 'Spread Porcentual', 'Spread porcentual entre Binance y BCV con bandas estadísticas históricas.')"
+                            class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="Pantalla completa">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                            </svg>
+                        </button>
                     </div>
                 </div>
                 <p class="text-xs text-gray-500">Spread porcentual entre Binance y BCV con bandas estadísticas históricas.</p>
@@ -280,7 +334,15 @@
             <div class="px-5 py-4 border-b border-gray-200">
                 <div class="flex items-center justify-between mb-2">
                     <h2 class="text-base font-bold text-gray-900">Tasa BCV Oficial</h2>
-                    <div class="flex items-center gap-1.5 text-xs font-medium"><div class="w-3 h-0.5 bg-blue-600 rounded-full"></div><span class="text-gray-600">BCV</span></div>
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-1.5 text-xs font-medium"><div class="w-3 h-0.5 bg-blue-600 rounded-full"></div><span class="text-gray-600">BCV</span></div>
+                        <button @click="openFullscreen('bcvRate', 'Tasa BCV Oficial', 'Evolución de la tasa oficial del Banco Central de Venezuela.')"
+                            class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="Pantalla completa">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
                 <p class="text-xs text-gray-500">Evolución de la tasa oficial del Banco Central de Venezuela.</p>
             </div>
@@ -297,7 +359,15 @@
             <div class="px-5 py-4 border-b border-gray-200">
                 <div class="flex items-center justify-between mb-2">
                     <h2 class="text-base font-bold text-gray-900">Tasa Binance P2P</h2>
-                    <div class="flex items-center gap-1.5 text-xs font-medium"><div class="w-3 h-0.5 bg-orange-600 rounded-full"></div><span class="text-gray-600">Binance</span></div>
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-1.5 text-xs font-medium"><div class="w-3 h-0.5 bg-orange-600 rounded-full"></div><span class="text-gray-600">Binance</span></div>
+                        <button @click="openFullscreen('binanceRate', 'Tasa Binance P2P', 'Evolución de la tasa promedio en Binance P2P.')"
+                            class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="Pantalla completa">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
                 <p class="text-xs text-gray-500">Evolución de la tasa promedio en Binance P2P.</p>
             </div>
@@ -317,9 +387,17 @@
             <div class="px-5 py-4 border-b border-gray-200">
                 <div class="flex items-center justify-between mb-2">
                     <h2 class="text-base font-bold text-gray-900">Cambios Diarios</h2>
-                    <div class="flex items-center gap-3 text-xs font-medium">
-                        <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-emerald-600"></div><span class="text-gray-600">Aumentos</span></div>
-                        <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-red-600"></div><span class="text-gray-600">Disminuciones</span></div>
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-3 text-xs font-medium">
+                            <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-emerald-600"></div><span class="text-gray-600">Aumentos</span></div>
+                            <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-red-600"></div><span class="text-gray-600">Disminuciones</span></div>
+                        </div>
+                        <button @click="openFullscreen('volatility', 'Cambios Diarios', 'Variación porcentual día a día de Binance.')"
+                            class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="Pantalla completa">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                            </svg>
+                        </button>
                     </div>
                 </div>
                 <p class="text-xs text-gray-500">Variación porcentual día a día de Binance.</p>
@@ -335,7 +413,15 @@
         <!-- Chart 5: Distribución -->
         <div class="bg-white rounded-lg shadow-sm border border-gray-200">
             <div class="px-5 py-4 border-b border-gray-200">
-                <h2 class="text-base font-bold text-gray-900 mb-2">Distribución del Spread</h2>
+                <div class="flex items-center justify-between mb-2">
+                    <h2 class="text-base font-bold text-gray-900">Distribución del Spread</h2>
+                    <button @click="openFullscreen('distribution', 'Distribución del Spread', 'Histograma de frecuencias del spread %.')"
+                        class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="Pantalla completa">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                        </svg>
+                    </button>
+                </div>
                 <p class="text-xs text-gray-500">Histograma de frecuencias del spread %.</p>
             </div>
             <div class="p-5">
@@ -347,6 +433,36 @@
         </div>
 
     </div>
+
+    <!-- Fullscreen Modal -->
+    <div x-show="fullscreenChart"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        @keydown.escape.window="closeFullscreen()"
+        class="fixed inset-0 z-50 bg-white flex flex-col"
+        style="display: none;">
+        <!-- Modal Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <div>
+                <h2 class="text-lg font-bold text-gray-900" x-text="fullscreenTitle"></h2>
+                <p class="text-sm text-gray-500" x-text="fullscreenSubtitle"></p>
+            </div>
+            <button @click="closeFullscreen()"
+                class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded-lg transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <!-- Modal Chart Container -->
+        <div class="flex-1 p-6">
+            <div id="fullscreenChartContainer" class="w-full h-full"></div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -355,7 +471,10 @@
 function chartApp() {
     return {
         days: 30,
+        today: new Date().toISOString().split('T')[0],
         endDate: new Date().toISOString().split('T')[0],
+        startDate: new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        customRange: false,
         loading: false,
         error: null,
         charts: { bcvRate: null, binanceRate: null, spreadDual: null, volatility: null, distribution: null },
@@ -364,10 +483,131 @@ function chartApp() {
         binanceAmount: '',
         bsAmount: '',
         lastBinanceDate: null,
+        quickRanges: [
+            { days: 7, label: '7 días' },
+            { days: 30, label: '30 días' },
+            { days: 90, label: '90 días' },
+            { days: 180, label: '6 meses' },
+            { days: 365, label: '1 año' }
+        ],
+        fullscreenChart: null,
+        fullscreenTitle: '',
+        fullscreenSubtitle: '',
+        fullscreenChartInstance: null,
+        cachedBcvFilled: [],
+        cachedBinanceRates: [],
 
         init() {
             this.fetchData();
             setInterval(() => this.fetchData(), 300000);
+        },
+
+        setQuickRange(numDays) {
+            this.days = numDays;
+            this.customRange = false;
+            this.endDate = this.today;
+            this.startDate = new Date(Date.now() - (numDays - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            this.fetchData();
+        },
+
+        applyCustomRange() {
+            if (!this.startDate || !this.endDate) return;
+            const start = new Date(this.startDate);
+            const end = new Date(this.endDate);
+            if (start > end) return;
+            this.customRange = true;
+            this.days = Math.ceil((end - start) / (24 * 60 * 60 * 1000)) + 1;
+            this.fetchData();
+        },
+
+        openFullscreen(chartType, title, subtitle) {
+            this.fullscreenChart = chartType;
+            this.fullscreenTitle = title;
+            this.fullscreenSubtitle = subtitle;
+            document.body.style.overflow = 'hidden';
+            this.$nextTick(() => {
+                this.renderFullscreenChart(chartType);
+            });
+        },
+
+        closeFullscreen() {
+            if (this.fullscreenChartInstance) {
+                this.fullscreenChartInstance.remove();
+                this.fullscreenChartInstance = null;
+            }
+            this.fullscreenChart = null;
+            document.body.style.overflow = '';
+        },
+
+        renderFullscreenChart(chartType) {
+            const container = document.getElementById('fullscreenChartContainer');
+            if (!container) return;
+
+            if (this.fullscreenChartInstance) {
+                this.fullscreenChartInstance.remove();
+            }
+
+            const height = container.clientHeight || window.innerHeight - 150;
+            this.fullscreenChartInstance = LightweightCharts.createChart(container, {
+                width: container.clientWidth,
+                height: height,
+                layout: { background: { color: '#fff' }, textColor: '#333' },
+                grid: { vertLines: { color: '#f0f0f0' }, horzLines: { color: '#f0f0f0' } },
+                timeScale: { borderColor: '#ccc', timeVisible: true, secondsVisible: false },
+                rightPriceScale: { borderColor: '#ccc', scaleMargins: { top: 0.1, bottom: 0.1 } },
+            });
+
+            const bcvFilled = this.cachedBcvFilled;
+            const binanceRates = this.cachedBinanceRates;
+
+            if (chartType === 'bcvRate') {
+                const data = this.prepareTimeSeriesData(bcvFilled, 'timestamp');
+                const series = this.fullscreenChartInstance.addAreaSeries({ topColor: 'rgba(37,99,235,0.3)', bottomColor: 'rgba(37,99,235,0.05)', lineColor: '#2563eb', lineWidth: 2.5 });
+                series.setData(data);
+            } else if (chartType === 'binanceRate') {
+                const data = this.prepareTimeSeriesData(binanceRates, 'timestamp');
+                const series = this.fullscreenChartInstance.addAreaSeries({ topColor: 'rgba(249,115,22,0.3)', bottomColor: 'rgba(249,115,22,0.05)', lineColor: '#f97316', lineWidth: 2.5 });
+                series.setData(data);
+            } else if (chartType === 'spreadDual') {
+                const bcvMap = new Map(bcvFilled.map(r => [r.timestamp, parseFloat(r.rate)]));
+                const spreadData = [];
+                binanceRates.forEach(r => {
+                    const bRate = parseFloat(r.rate), cRate = bcvMap.get(r.timestamp);
+                    if (!cRate || !bRate) return;
+                    spreadData.push({ time: Math.floor(new Date(r.timestamp).getTime() / 1000), value: ((bRate - cRate) / bRate) * 100 });
+                });
+                const line = this.fullscreenChartInstance.addLineSeries({ color: '#9333ea', lineWidth: 2.5 });
+                line.setData(spreadData);
+                if (this.stats.spreadStats && spreadData.length > 0) {
+                    const avgLine = this.fullscreenChartInstance.addLineSeries({ color: '#f59e0b', lineWidth: 2, priceLineVisible: false });
+                    avgLine.setData(spreadData.map(d => ({ time: d.time, value: this.stats.spreadStats.avg })));
+                    const p75Line = this.fullscreenChartInstance.addLineSeries({ color: '#10b981', lineWidth: 2, priceLineVisible: false });
+                    p75Line.setData(spreadData.map(d => ({ time: d.time, value: this.stats.spreadStats.p75 })));
+                    const minLine = this.fullscreenChartInstance.addLineSeries({ color: '#ef4444', lineWidth: 2, priceLineVisible: false });
+                    minLine.setData(spreadData.map(d => ({ time: d.time, value: this.stats.spreadStats.min })));
+                    const maxLine = this.fullscreenChartInstance.addLineSeries({ color: '#2563eb', lineWidth: 2, priceLineVisible: false });
+                    maxLine.setData(spreadData.map(d => ({ time: d.time, value: this.stats.spreadStats.max })));
+                }
+            } else if (chartType === 'volatility') {
+                const changes = this.calculateDailyChanges(binanceRates, 'timestamp');
+                if (changes.length > 0) {
+                    const series = this.fullscreenChartInstance.addHistogramSeries({ color: '#f97316' });
+                    series.setData(changes);
+                    const zeroLine = this.fullscreenChartInstance.addLineSeries({ color: '#94a3b8', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
+                    zeroLine.setData(changes.map(d => ({ time: d.time, value: 0 })));
+                }
+            } else if (chartType === 'distribution') {
+                this.fullscreenChartInstance.applyOptions({ timeScale: { visible: false } });
+                const bcvMap = new Map(bcvFilled.map(r => [r.timestamp, parseFloat(r.rate)]));
+                const spreads = binanceRates.map(r => { const b = parseFloat(r.rate), c = bcvMap.get(r.timestamp); return c && b ? ((b - c) / b) * 100 : null; }).filter(v => v !== null);
+                const bins = this.createHistogramBins(spreads, 20);
+                const histData = bins.map((count, i) => ({ time: i, value: count, color: this.getColorForSpreadBin(i, bins.length) }));
+                const series = this.fullscreenChartInstance.addHistogramSeries({});
+                series.setData(histData);
+            }
+
+            this.fullscreenChartInstance.timeScale().fitContent();
+            this.makeResponsive(container, this.fullscreenChartInstance);
         },
 
         parseNumber(str) {
@@ -490,6 +730,9 @@ function chartApp() {
         renderAllCharts(bcvRates, binanceRates) {
             if (typeof LightweightCharts === 'undefined') { this.error = 'Error de gráficos'; return; }
             const bcvFilled = this.fillBcvGaps(bcvRates, binanceRates);
+            // Cache data for fullscreen mode
+            this.cachedBcvFilled = bcvFilled;
+            this.cachedBinanceRates = binanceRates;
             Object.values(this.charts).forEach(c => { if (c) c.remove(); });
             this.renderBcvRateChart(bcvFilled, binanceRates);
             this.renderBinanceRateChart(bcvFilled, binanceRates);
